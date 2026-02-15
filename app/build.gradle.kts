@@ -26,13 +26,11 @@ android {
             excludes += "META-INF/LICENSE.txt"
             excludes += "META-INF/NOTICE"
             excludes += "META-INF/NOTICE.txt"
+            pickFirsts += "**/**.xml"
+            pickFirsts += "**/**.png"
         }
         jniLibs {
             pickFirsts += "lib/**/libc++_shared.so"
-        }
-        resources {
-            pickFirsts += "**/**.xml"
-            pickFirsts += "**/**.png"
         }
     }
 
@@ -152,12 +150,10 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
     implementation(libs.generativeai)
     implementation(libs.androidx.mediarouter)
     implementation(libs.play.services.cast.framework)
     implementation(libs.androidx.navigation.runtime.ktx)
-    implementation(libs.androidx.compose.material3)
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
@@ -253,8 +249,6 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.session)
-    implementation(libs.androidx.media.router)
-    implementation(libs.google.play.services.cast.framework)
     implementation(libs.androidx.media3.exoplayer.ffmpeg)
 
     // Palette API for color extraction
@@ -271,8 +265,7 @@ dependencies {
     //Wavy slider
     implementation(libs.wavy.slider)
 
-    // Splash Screen API
-    implementation(libs.androidx.core.splashscreen) // Or the latest version
+    // Splash Screen API (already included above)
 
     //Icons
     implementation(libs.androidx.material.icons.core)
