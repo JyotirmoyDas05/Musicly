@@ -32,6 +32,9 @@ jobs:
           fileName: 'keystore.jks'
           encodedString: ${{ secrets.KEYSTORE_BASE64 }}
 
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
       - name: Build Release APK & Bundle
         run: ./gradlew assembleRelease bundleRelease
         env:
