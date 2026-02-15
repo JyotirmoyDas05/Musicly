@@ -36,7 +36,12 @@ android {
 
     splits {
         abi {
-            isEnable = true
+            // Disable ABI splits when building an AAB (bundleRelease) because the
+            // Android App Bundle format handles ABI targeting natively. Keeping
+            // splits enabled during bundling causes AGP to fail with
+            // "Sequence contains more than one matching element" at buildReleasePreBundle.
+            val isBundle = gradle.startParameter.taskNames.any { it.contains("bundle", ignoreCase = true) }
+            isEnable = !isBundle
             reset()
             include("x86", "x86_64", "armeabi-v7a", "arm64-v8a")
             isUniversalApk = true
