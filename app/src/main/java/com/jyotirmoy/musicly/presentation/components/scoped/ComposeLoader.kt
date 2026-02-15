@@ -1,0 +1,118 @@
+package com.jyotirmoy.musicly.presentation.components.scoped
+
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
+
+// ------------------------------------------------------------
+// 1) Phase loader: compose a subtree only after a threshold, then keep it alive
+// ------------------------------------------------------------
+@Composable
+fun DeferAt(
+    expansionFraction: Float,
+    threshold: Float,
+    keepAliveKey: Any? = "default",
+    content: @Composable () -> Unit
+) {
+    var ready by rememberSaveable(keepAliveKey) { mutableStateOf(false) }
+    LaunchedEffect(expansionFraction) {
+        if (!ready && expansionFraction >= threshold) ready = true
+    }
+    if (ready) content()
+}
+
+
+@Composable
+fun DeferUntil(
+    condition: Boolean,
+    keepAliveKey: Any? = "default",
+    content: @Composable () -> Unit
+) {
+    var ready by rememberSaveable(keepAliveKey) { mutableStateOf(false) }
+    LaunchedEffect(condition) { if (condition) ready = true }
+    if (ready) content()
+}
+
+// ------------------------------------------------------------
+// 2) Smooth progress sampler for long-running sliders/meters
+// Cuts recompositions from ~50–60 FPS position updates down to ~5 FPS,
+// while animating the UI in between so it still looks 60 FPS.
+// ------------------------------------------------------------
+@Composable
+fun rememberSmoothProgress(
+    isPlayingProvider: () -> Boolean,
+    currentPositionProvider: () -> Long,
+    totalDuration: Long,
+    sampleWhilePlayingMs: Long = 200L,
+    sampleWhilePausedMs: Long = 800L,
+    isVisible: Boolean = true
+): Pair<androidx.compose.runtime.State<Float>, androidx.compose.runtime.State<Long>> {
+    var sampledPosition by remember { mutableLongStateOf(0L) }
+    var targetFraction by remember { mutableFloatStateOf(0f) }
+
+    val latestPositionProvider by rememberUpdatedState(newValue = currentPositionProvider)
+    val latestIsPlayingProvider by rememberUpdatedState(newValue = isPlayingProvider)
+
+    val safeDuration = totalDuration.coerceAtLeast(1L)
+    val safeUpperBound = totalDuration.coerceAtLeast(0L)
+
+    LaunchedEffect(totalDuration, sampleWhilePlayingMs, sampleWhilePausedMs, isVisible) {
+        if (!isVisible) return@LaunchedEffect
+
+        while (isActive) {
+            val isPlaying = latestIsPlayingProvider()
+            val rawPosition = latestPositionProvider()
+            val clampedPosition = rawPosition.coerceIn(0L, safeUpperBound)
+
+            sampledPosition = clampedPosition
+            targetFraction = (clampedPosition / safeDuration.toFloat()).coerceIn(0f, 1f)
+
+            val delayMillis = if (isPlaying) sampleWhilePlayingMs else sampleWhilePausedMs
+            delay(delayMillis.coerceAtLeast(1L))
+        }
+    }
+
+    val isPlaying = latestIsPlayingProvider()
+    val animationDuration = ((if (isPlaying) sampleWhilePlayingMs else sampleWhilePausedMs) * 0.9f)
+        .roundToInt()
+        .coerceAtLeast(1)
+    
+    val smoothState = if (isVisible) {
+        animateFloatAsState(
+            targetValue = targetFraction,
+            animationSpec = tween(durationMillis = animationDuration, easing = LinearEasing),
+            label = "SmoothProgressAnim"
+        )
+    } else {
+        rememberUpdatedState(targetFraction)
+    }
+
+    val animatedPositionState = remember(smoothState, safeDuration, totalDuration) {
+        derivedStateOf {
+            (smoothState.value * safeDuration).roundToLong().coerceIn(0L, totalDuration)
+        }
+    }
+    
+    val displayedPositionState = remember(isPlaying, animatedPositionState, sampledPosition) {
+        derivedStateOf {
+            if (isPlaying) animatedPositionState.value else sampledPosition
+        }
+    }
+
+    return smoothState to displayedPositionState
+}

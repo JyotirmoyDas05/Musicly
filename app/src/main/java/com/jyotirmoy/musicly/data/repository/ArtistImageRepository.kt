@@ -1,0 +1,174 @@
+package com.jyotirmoy.musicly.data.repository
+
+import android.util.Log
+import android.util.LruCache
+import com.jyotirmoy.musicly.data.database.MusicDao
+import com.jyotirmoy.musicly.data.network.deezer.DeezerApiService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Repository for fetching and caching artist images from Deezer API.
+ * Uses both in-memory LRU cache and Room database for persistent storage.
+ */
+@Singleton
+class ArtistImageRepository @Inject constructor(
+    private val deezerApiService: DeezerApiService,
+    private val musicDao: MusicDao
+) {
+    companion object {
+        private const val TAG = "ArtistImageRepository"
+        private const val CACHE_SIZE = 100 // Number of artist images to cache in memory
+        private val deezerSizeRegex = Regex("/\\d{2,4}x\\d{2,4}([\\-.])")
+    }
+
+    // In-memory LRU cache for quick access
+    private val memoryCache = LruCache<String, String>(CACHE_SIZE)
+    
+    // Mutex to prevent duplicate API calls for the same artist
+    private val fetchMutex = Mutex()
+    private val pendingFetches = mutableSetOf<String>()
+    
+    // Set to track artists for whom image fetching failed (e.g. not found), to avoid retrying in the same session
+    private val failedFetches = mutableSetOf<String>()
+
+    /**
+     * Get artist image URL, fetching from Deezer if not cached.
+     * @param artistName Name of the artist
+     * @param artistId Room database ID of the artist (for caching)
+     * @return Image URL or null if not found
+     */
+    suspend fun getArtistImageUrl(artistName: String, artistId: Long): String? {
+        if (artistName.isBlank()) return null
+
+        val normalizedName = artistName.trim().lowercase()
+
+        // Check memory cache first
+        memoryCache.get(normalizedName)?.let { cachedUrl ->
+            return cachedUrl
+        }
+        
+        // Check if previously failed
+        if (failedFetches.contains(normalizedName)) {
+            return null
+        }
+
+        // Resolve canonical DB artist row by name to avoid MediaStore-ID/DB-ID mismatches.
+        val (resolvedArtistId, dbCachedUrl) = withContext(Dispatchers.IO) {
+            val canonicalArtistId = musicDao.getArtistIdByNormalizedName(artistName) ?: artistId
+            val cachedUrl = musicDao.getArtistImageUrl(canonicalArtistId)
+                ?: musicDao.getArtistImageUrlByNormalizedName(artistName)
+            canonicalArtistId to cachedUrl
+        }
+        if (!dbCachedUrl.isNullOrEmpty()) {
+            val upgradedDbUrl = upgradeToHighResDeezerUrl(dbCachedUrl)
+            memoryCache.put(normalizedName, upgradedDbUrl)
+            if (upgradedDbUrl != dbCachedUrl) {
+                withContext(Dispatchers.IO) {
+                    musicDao.updateArtistImageUrl(resolvedArtistId, upgradedDbUrl)
+                }
+            }
+            return upgradedDbUrl
+        }
+
+        // Fetch from Deezer API
+        return fetchAndCacheArtistImage(artistName, resolvedArtistId, normalizedName)
+    }
+
+    /**
+     * Prefetch artist images for a list of artists in background.
+     * Useful for batch loading when displaying artist lists.
+     */
+    suspend fun prefetchArtistImages(artists: List<Pair<Long, String>>) {
+        withContext(Dispatchers.IO) {
+            artists.forEach { (artistId, artistName) ->
+                try {
+                     val normalizedName = artistName.trim().lowercase()
+                     // Only fetch if not in memory, not failed, and not pending
+                     if(memoryCache.get(normalizedName) == null && !failedFetches.contains(normalizedName)) {
+                         getArtistImageUrl(artistName, artistId)
+                     }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to prefetch image for $artistName: ${e.message}")
+                }
+            }
+        }
+    }
+    
+    // ... fetchAndCacheArtistImage method ...
+    
+    private suspend fun fetchAndCacheArtistImage(
+        artistName: String,
+        artistId: Long,
+        normalizedName: String
+    ): String? {
+        // Prevent duplicate fetches for the same artist
+        fetchMutex.withLock {
+            if (pendingFetches.contains(normalizedName)) {
+                return null // Already fetching
+            }
+            pendingFetches.add(normalizedName)
+        }
+
+        return try {
+            withContext(Dispatchers.IO) {
+                val response = deezerApiService.searchArtist(artistName, limit = 1)
+                val deezerArtist = response.data.firstOrNull()
+
+                if (deezerArtist != null) {
+                    val imageUrl = (
+                        deezerArtist.pictureXl
+                            ?: deezerArtist.pictureBig
+                            ?: deezerArtist.pictureMedium
+                            ?: deezerArtist.picture
+                        )?.let(::upgradeToHighResDeezerUrl)
+
+                    if (!imageUrl.isNullOrEmpty()) {
+                        // Cache in memory
+                        memoryCache.put(normalizedName, imageUrl)
+                        
+                        // Cache in database
+                        musicDao.updateArtistImageUrl(artistId, imageUrl)
+                        
+                        Log.d(TAG, "Fetched and cached image for $artistName: $imageUrl")
+                        imageUrl
+                    } else {
+                        null
+                    }
+                } else {
+                    Log.d(TAG, "No Deezer artist found for: $artistName")
+                    failedFetches.add(normalizedName) // Mark as failed
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching artist image for $artistName: ${e.message}")
+            // Consider transient errors? For now treating as failed to avoid spam.
+            if(e !is java.net.SocketTimeoutException) {
+                failedFetches.add(normalizedName)
+            }
+            null
+        } finally {
+            fetchMutex.withLock {
+                pendingFetches.remove(normalizedName)
+            }
+        }
+    }
+    
+    /**
+     * Clear all cached images. Useful for debugging or forced refresh.
+     */
+    fun clearCache() {
+        memoryCache.evictAll()
+        failedFetches.clear()
+    }
+
+    private fun upgradeToHighResDeezerUrl(url: String): String {
+        if (!url.contains("dzcdn.net/images/artist")) return url
+        return deezerSizeRegex.replace(url, "/1000x1000$1")
+    }
+}
