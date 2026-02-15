@@ -36,7 +36,7 @@ jobs:
         run: ./gradlew assembleRelease bundleRelease
         env:
           KEYSTORE_PATH: ${{ steps.decode_keystore.outputs.filePath }}
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 

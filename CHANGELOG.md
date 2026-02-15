@@ -5,11 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.0-beta] - 2026-02-15
 
 ## [0.5.0-beta] - 2026-01-14
 
 ### Added
+
 - Implemented 10-band Equalizer and effects suite (feat: @Jyotirmoy)
 - Added M3U playlist import/export support (feat/fix: @lostf1sh, @Jyotirmoy)
 - Integrated Deezer API for artist images (feat: @lostf1sh)
@@ -19,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added support for custom playlist covers
 
 ### Changed
+
 - **Material 3 Expressive UI**: Modernized Settings, Stats, Player, Bottom Sheets, and dialogs (refactor: @Jyotirmoy, @lostf1sh)
 - **Library Sync**: Rebuilt initial sync flow with phase-based progress reporting and linear indicators (feat: @lostf1sh)
 - **Settings Architecture**: Introduced category sub-screens and improved navigation handling (refactor/fix: @Jyotirmoy)
@@ -26,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved widget previews and case-insensitive sorting logic (feat/fix: @lostf1sh, @google-labs-julesbot)
 
 ### Fixed
+
 - Fixed casting stability, queue transitions, and reduced latency (fix: @Jyotirmoy)
 - Fixed delayed content rendering and unwanted collapses in Player Sheet (fix/refactor: @Jyotirmoy)
 - Fixed reordering issues in queue
@@ -34,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.0-beta] - 2025-12-15
 
 ### Added
+
 - Major navigation redesign
 - New file explorer for choosing source directories
 - Landscape mode (thanks to "leave this blank for now")
@@ -53,11 +57,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.0-beta] - 2025-10-28
 
 ### What's new
+
 - Introduced a richer listening stats hub with deeper insights into your sessions.
 - Launched a floating quick player to instantly open and preview local files.
 - Added a folders tab with a tree-style navigator and playlist-ready view.
 
 ### Improvements
+
 - Refined the overall Material 3 UI for a cleaner and more cohesive experience.
 - Smoothed out animations and transitions across the app for more fluid navigation.
 - Enhanced the artist screen layout with richer details and polish.
@@ -67,12 +73,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expanded support for a broader range of audio file formats.
 
 ### Fixes
+
 - Resolved metadata quirks so song details stay accurate everywhere.
 - Restored notification shortcuts so they reliably jump back into playback.
 
 ## [0.2.0-beta] - 2024-09-15
 
 ### Added
+
 - Chromecast support for casting audio from your device (temporarily disabled).
 - In-app changelog to keep you updated on the latest features.
 - Improved lyrics search
@@ -87,6 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New settings to clear the cache.
 
 ### Changed
+
 - Complete redesign of the user interface.
 - Complete redesign of the player.
 - Performance improvements in the library.
@@ -94,6 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The AI now provides better results.
 
 ### Fixed
+
 - Fixed various bugs in the tag editor.
 - Fixed a bug where the playback notification was not clearing.
 - Fixed several bugs that caused the app to crash.
@@ -101,6 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0-beta] - 2024-08-30
 
 ### Added
+
 - Initial beta release of Musicly Music Player.
 - Local music scanning and playback (MP3, FLAC, AAC).
 - Background playback using a foreground service and Media3.

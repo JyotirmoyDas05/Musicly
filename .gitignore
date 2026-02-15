@@ -27,3 +27,5 @@ app/src/main/java/com/jyotirmoy/musicly/data/AGENTS.md
 app/src/main/java/com/jyotirmoy/musicly/presentation/AGENTS.md
 build.log
 build_refine.log
+my-release-key.jks
+keystore_base64.txt
