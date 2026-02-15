@@ -47,12 +47,35 @@ jobs:
         id: changelog
         shell: bash
         run: |
-          # Extract the latest version from CHANGELOG.md (assuming format ## [Version] - Date)
-          # Or just use the whole unreleased section if this is a tag push
-          # Simple approach: Read content marked for this version.
-          # For now, we'll just use the tag name as title.
-          echo "Processing changelog..."
+          # Extract the latest version from CHANGELOG.md
+          # Find the lines between the first two "## [" markers
+          sed -n '/^## \[/p' CHANGELOG.md | head -n 2 > headers.txt
+          START_LINE=$(grep -nFf <(head -n 1 headers.txt) CHANGELOG.md | cut -d: -f1)
+          if [ -z "$START_LINE" ]; then
+            echo "::warning::Could not find start of changelog"
+            echo "CHANGELOG_BODY=No changelog found" >> $GITHUB_ENV
+            exit 0
+          fi
+          
+          # Find the next header line number, if it exists
+          NEXT_HEADER=$(head -n 2 headers.txt | tail -n 1)
+          if [ "$(wc -l < headers.txt)" -eq "1" ]; then
+             # Only one version, read until end
+             END_LINE=$(wc -l < CHANGELOG.md)
+          else
+             END_LINE=$(grep -nF "$NEXT_HEADER" CHANGELOG.md | tail -n 1 | cut -d: -f1)
+             END_LINE=$((END_LINE - 1))
+          fi
 
+          # Extract content
+          sed -n "${START_LINE},${END_LINE}p" CHANGELOG.md > RELEASE_BODY.md
+          
+          # Clean up the header line itself if desired, or keep it.
+          # Let's keep it but maybe remove the date?
+          # Actually, let's just dump it to the output
+          echo "Extracted changelog:"
+          cat RELEASE_BODY.md
+          
       - name: Create Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
@@ -61,5 +84,5 @@ jobs:
             app/build/outputs/apk/release/*.apk
             app/build/outputs/bundle/release/*.aab
             app/build/outputs/mapping/release/mapping.txt
-          body_path: CHANGELOG.md # Or better, extract a specific section
-          generate_release_notes: true # Auto-generate from PRs if no changelog is parsed
+          body_path: RELEASE_BODY.md
+          generate_release_notes: false
