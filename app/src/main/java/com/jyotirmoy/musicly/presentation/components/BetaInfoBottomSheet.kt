@@ -69,7 +69,7 @@ fun BetaInfoBottomSheet(modifier: Modifier = Modifier) {
             item(key = "header") {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Beta 0.6.0",
+                        text = "Beta 0.7.0",
                         fontFamily = GoogleSansRounded,
                         style = ExpTitleTypography.displaySmall,
                         color = MaterialTheme.colorScheme.onSurface
@@ -139,12 +139,12 @@ fun BetaInfoBottomSheet(modifier: Modifier = Modifier) {
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(
-                                text = "Welcome to the first 0.6.0 beta!",
+                                text = "Welcome to the 0.7.0 beta!",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "This huge update brings a complete UI overhaul, 10-band Equalizer, and AI powers.",
+                                text = "This update brings full YouTube Music integration with online playlists and improved stream playback.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -189,22 +189,22 @@ fun BetaInfoBottomSheet(modifier: Modifier = Modifier) {
                             )
                         }
                         Text(
-                            text = "Material 3 Expressive UI refresh across Settings, Player, and Bottom Sheets.",
+                            text = "Full YouTube Music online playlist integration with seamless playback.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "New 10-band Equalizer with effects, plus AI integration for smarter playlists.",
+                            text = "Online playlist detail screen featuring M3 Expressive design and background song pre-loading.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Rebuilt Library Sync for reliability and linear progress reporting.",
+                            text = "Metrolist-pattern online playback implementation for proper stream resolution.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Major fixes for Casting, Queue stability, and lyrics synchronization.",
+                            text = "Fixed online song skipping and improved MediaItem URI handling for video ID detection.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

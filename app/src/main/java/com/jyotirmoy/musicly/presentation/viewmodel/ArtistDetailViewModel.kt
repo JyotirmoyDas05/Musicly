@@ -8,9 +8,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jyotirmoy.musicly.R
 import com.jyotirmoy.musicly.data.model.Artist
+import com.jyotirmoy.musicly.data.model.OnlineArtistDetail
+import com.jyotirmoy.musicly.data.model.OnlineArtistSection
 import com.jyotirmoy.musicly.data.model.Song
 import com.jyotirmoy.musicly.data.repository.ArtistImageRepository
 import com.jyotirmoy.musicly.data.repository.MusicRepository
+import com.jyotirmoy.musicly.data.repository.YouTubeRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +29,11 @@ data class ArtistDetailUiState(
     val artist: Artist? = null,
     val songs: List<Song> = emptyList(),
     val albumSections: List<ArtistAlbumSection> = emptyList(),
+    /** Online artist detail — set when navigating with a YouTube browseId */
+    val onlineArtist: OnlineArtistDetail? = null,
+    /** Online artist content sections (songs, albums, singles, etc.) */
+    val onlineSections: List<OnlineArtistSection> = emptyList(),
+    val isOnline: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null
 )
@@ -43,6 +51,7 @@ data class ArtistAlbumSection(
 class ArtistDetailViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val musicRepository: MusicRepository,
+    private val youTubeRepository: YouTubeRepository,
     private val artistImageRepository: ArtistImageRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -55,9 +64,11 @@ class ArtistDetailViewModel @Inject constructor(
         if (artistIdString != null) {
             val artistId = artistIdString.toLongOrNull()
             if (artistId != null) {
+                // Local artist (numeric ID from MediaStore)
                 loadArtistData(artistId)
             } else {
-                _uiState.update { it.copy(error = context.getString(R.string.invalid_artist_id), isLoading = false) }
+                // Online artist (YouTube browseId like "UC...")
+                loadOnlineArtistData(artistIdString)
             }
         } else {
             _uiState.update { it.copy(error = context.getString(R.string.artist_id_not_found), isLoading = false) }
@@ -144,6 +155,33 @@ class ArtistDetailViewModel @Inject constructor(
             currentState.copy(
                 albumSections = updatedAlbumSections,
                 songs = currentState.songs.filterNot { it.id == songId } // Also update the main songs list
+            )
+        }
+    }
+
+    private fun loadOnlineArtistData(browseId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null, isOnline = true) }
+
+            youTubeRepository.getArtistDetails(browseId).fold(
+                onSuccess = { detail ->
+                    _uiState.update {
+                        it.copy(
+                            onlineArtist = detail,
+                            onlineSections = detail.sections,
+                            isLoading = false,
+                            isOnline = true,
+                        )
+                    }
+                },
+                onFailure = { e ->
+                    _uiState.update {
+                        it.copy(
+                            error = "Failed to load artist: ${e.localizedMessage ?: "Unknown error"}",
+                            isLoading = false,
+                        )
+                    }
+                }
             )
         }
     }

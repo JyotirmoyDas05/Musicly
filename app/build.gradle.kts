@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     id("com.google.devtools.ksp") version "2.1.0-1.0.29"
@@ -56,9 +58,19 @@ android {
         versionName = project.findProperty("APP_VERSION_NAME") as String
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        
+
         // Remove unused resources (languages)
-        resConfigs("en") 
+        resConfigs("en")
+
+        // PoToken keys — read from local.properties or env (CI)
+        val localProps = Properties().also { props ->
+            val f = rootProject.file("local.properties")
+            if (f.exists()) props.load(f.inputStream())
+        }
+        fun secret(key: String) = System.getenv(key) ?: localProps.getProperty(key) ?: ""
+
+        buildConfigField("String", "GOOGLE_API_KEY", "\"${secret("GOOGLE_API_KEY")}\"")
+        buildConfigField("String", "POTOKEN_REQUEST_KEY", "\"${secret("POTOKEN_REQUEST_KEY")}\"")
     }
 
     signingConfigs {
@@ -148,6 +160,7 @@ dependencies {
     "baselineProfile"(project(":baselineprofile"))
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
+    implementation(libs.kotlinx.coroutines.guava)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -255,6 +268,7 @@ dependencies {
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.session)
     implementation(libs.androidx.media3.exoplayer.ffmpeg)
+    implementation(libs.androidx.media3.datasource.okhttp)
 
     // Palette API for color extraction
     implementation(libs.androidx.palette.ktx)
@@ -339,5 +353,8 @@ dependencies {
     implementation(libs.androidx.app)
     implementation(libs.androidx.app.projected)
 
+    implementation(libs.newpipeextractor)
+    implementation(libs.brotli)
+    implementation(project(":innertube"))
 }
 

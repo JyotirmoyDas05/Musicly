@@ -116,33 +116,52 @@ class LyricsRepositoryImpl @Inject constructor(
     ): List<LrcLibResponse> = coroutineScope {
         if (strategies.isEmpty()) return@coroutineScope emptyList()
 
-        val channel = Channel<RemoteSearchBatch>(capacity = strategies.size)
+        val channel = Channel<Result<RemoteSearchBatch>>(capacity = strategies.size)
         val jobs = strategies.map { strategy ->
             launch {
-                val responses = runCatching { strategy.request() }
-                    .getOrNull()
-                    ?.toList()
-                    .orEmpty()
-                channel.trySend(
+                val result = runCatching {
+                    val responses = strategy.request()?.toList().orEmpty()
                     RemoteSearchBatch(
                         strategyName = strategy.name,
                         responses = responses
                     )
-                )
+                }
+                channel.trySend(result)
             }
         }
 
+        val failures = mutableListOf<Throwable>()
+        var hasEmptySuccess = false
+
         repeat(strategies.size) {
-            val batch = channel.receive()
-            if (batch.responses.isNotEmpty()) {
-                Log.d(TAG, "Fast search hit from strategy: ${batch.strategyName} (${batch.responses.size} results)")
-                jobs.forEach { it.cancel() }
-                channel.close()
-                return@coroutineScope batch.responses.distinctBy { it.id }
+            val result = channel.receive()
+            if (result.isSuccess) {
+                val batch = result.getOrThrow()
+                if (batch.responses.isNotEmpty()) {
+                    Log.d(TAG, "Fast search hit from strategy: ${batch.strategyName} (${batch.responses.size} results)")
+                    jobs.forEach { it.cancel() }
+                    channel.close()
+                    return@coroutineScope batch.responses.distinctBy { it.id }
+                } else {
+                    hasEmptySuccess = true
+                }
+            } else {
+                result.exceptionOrNull()?.let { failures.add(it) }
             }
         }
 
         channel.close()
+        
+        // If we found successfully "nothing", return nothing (Not Found)
+        if (hasEmptySuccess) {
+            return@coroutineScope emptyList()
+        }
+
+        // If ALL strategies failed, throw the first exception (likely network error)
+        if (failures.isNotEmpty()) {
+            throw failures.first()
+        }
+
         emptyList()
     }
 
@@ -618,6 +637,7 @@ class LyricsRepositoryImpl @Inject constructor(
             LogUtils.e(this@LyricsRepositoryImpl, e, "Error fetching lyrics from remote")
             when {
                 e is HttpException && e.code() == 404 -> Result.failure(NoLyricsFoundException())
+                e is com.google.gson.JsonSyntaxException -> Result.failure(LyricsException(context.getString(R.string.lyrics_server_error, -1), e))
                 e is SocketTimeoutException -> Result.failure(LyricsException(context.getString(R.string.lyrics_fetch_timeout), e))
                 e is UnknownHostException -> Result.failure(LyricsException(context.getString(R.string.lyrics_network_error), e))
                 e is IOException -> Result.failure(LyricsException(context.getString(R.string.lyrics_network_error), e))
@@ -689,6 +709,10 @@ class LyricsRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             LogUtils.e(this@LyricsRepositoryImpl, e, "Error searching remote for lyrics")
             when {
+                // Return "Not Found" only if we specifically know it's not found (empty list from successful search handled above)
+                // But here we are catching exceptions. 
+                // If runSearchStrategiesFast throws, it means ALL strategies failed.
+                
                 e is SocketTimeoutException -> Result.failure(LyricsException(context.getString(R.string.lyrics_fetch_timeout), e))
                 e is UnknownHostException -> Result.failure(LyricsException(context.getString(R.string.lyrics_network_error), e))
                 e is IOException -> Result.failure(LyricsException(context.getString(R.string.lyrics_network_error), e))

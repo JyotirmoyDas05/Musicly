@@ -21,6 +21,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
@@ -40,10 +41,12 @@ import com.jyotirmoy.musicly.MusiclyApplication
 import com.jyotirmoy.musicly.R
 import com.jyotirmoy.musicly.data.model.PlayerInfo // Import new data class
 import com.jyotirmoy.musicly.data.repository.MusicRepository
+import com.jyotirmoy.musicly.data.service.player.YouTubeMediaSourceHelper
 import com.jyotirmoy.musicly.ui.glancewidget.MusiclyGlanceWidget
 import com.jyotirmoy.musicly.ui.glancewidget.PlayerActions
 import com.jyotirmoy.musicly.ui.glancewidget.PlayerInfoStateDefinition
 import com.jyotirmoy.musicly.utils.LogUtils
+import com.jyotirmoy.musicly.utils.YTPlayerUtils
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -80,6 +83,8 @@ class MusicService : MediaSessionService() {
     lateinit var userPreferencesRepository: UserPreferencesRepository
     @Inject
     lateinit var equalizerManager: EqualizerManager
+    @Inject
+    lateinit var youTubeMediaSourceHelper: YouTubeMediaSourceHelper
 
     private var favoriteSongIds = emptySet<String>()
     private var mediaSession: MediaSession? = null
@@ -87,6 +92,13 @@ class MusicService : MediaSessionService() {
     private var keepPlayingInBackground = true
     private var isManualShuffleEnabled = false
     private var persistentShuffleEnabled = false
+
+    // --- YouTube Error Recovery State ---
+    private val currentMediaIdRetryCount = mutableMapOf<String, Int>()
+    private val recentlyFailedSongs = mutableSetOf<String>()
+    private var failedSongsClearJob: Job? = null
+    private var consecutivePlaybackErr = 0
+    private var retryJob: Job? = null
     // --- Counted Play State ---
     private var countedPlayActive = false
     private var countedPlayTarget = 0
@@ -98,6 +110,15 @@ class MusicService : MediaSessionService() {
         private const val TAG = "MusicService_Musicly"
         const val NOTIFICATION_ID = 101
         const val ACTION_SLEEP_TIMER_EXPIRED = "com.jyotirmoy.musicly.ACTION_SLEEP_TIMER_EXPIRED"
+
+        // YouTube error recovery constants
+        private const val MAX_RETRY_PER_SONG = 3
+        private const val RETRY_DELAY_MS = 1000L
+        private const val MAX_CONSECUTIVE_ERR = 5
+        private const val FAILED_SONGS_CLEAR_DELAY_MS = 5 * 60 * 1000L // 5 minutes
+
+        /** YouTube video IDs are 11-char base64url strings. */
+        private val YOUTUBE_ID_REGEX = Regex("^[A-Za-z0-9_-]{11}$")
     }
 
     override fun onCreate() {
@@ -278,6 +299,7 @@ class MusicService : MediaSessionService() {
         mediaSession = MediaSession.Builder(this, engine.masterPlayer)
             .setSessionActivity(getOpenAppPendingIntent())
             .setCallback(callback)
+            .setBitmapLoader(com.jyotirmoy.musicly.utils.CoilBitmapLoader(this))
             .build()
 
         setMediaNotificationProvider(
@@ -349,6 +371,15 @@ class MusicService : MediaSessionService() {
         override fun onPlaybackStateChanged(playbackState: Int) {
             Timber.tag(TAG).d("Playback state changed: $playbackState")
             mediaSession?.let { refreshMediaSessionUi(it) }
+
+            // Reset error recovery state on successful playback
+            if (playbackState == Player.STATE_READY) {
+                consecutivePlaybackErr = 0
+                retryJob?.cancel()
+                engine.masterPlayer.currentMediaItem?.mediaId?.let { mediaId ->
+                    resetRetryCount(mediaId)
+                }
+            }
         }
 
         override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
@@ -367,7 +398,8 @@ class MusicService : MediaSessionService() {
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            Timber.tag(TAG).e(error, "Error en el reproductor: ")
+            Timber.tag(TAG).e(error, "Player error occurred")
+            handlePlayerError(error)
         }
     }
 
@@ -709,6 +741,240 @@ class MusicService : MediaSessionService() {
 
         // Restore normal repeat mode (OFF)
         engine.masterPlayer.repeatMode = Player.REPEAT_MODE_OFF
+    }
+
+    // ============================================================
+    // YouTube Error Recovery
+    // ============================================================
+
+    /**
+     * Returns true if the given mediaId looks like a YouTube video ID.
+     * Local songs use numeric IDs from MediaStore, so they won't match.
+     */
+    private fun isYouTubeMediaId(mediaId: String?): Boolean {
+        return mediaId != null && YOUTUBE_ID_REGEX.matches(mediaId)
+    }
+
+    // ---- Error detection helpers ----
+
+    private fun getHttpResponseCode(error: PlaybackException): Int? {
+        var cause: Throwable? = error
+        while (cause != null) {
+            if (cause is HttpDataSource.InvalidResponseCodeException) {
+                return cause.responseCode
+            }
+            cause = cause.cause
+        }
+        return null
+    }
+
+    private fun isExpiredUrlError(error: PlaybackException): Boolean {
+        return getHttpResponseCode(error) == 403
+    }
+
+    private fun isRangeNotSatisfiableError(error: PlaybackException): Boolean {
+        return getHttpResponseCode(error) == 416
+    }
+
+    private fun isPageReloadError(error: PlaybackException): Boolean {
+        val keywords = listOf("page needs to be reloaded", "reload", "page must be reloaded")
+        val messages = listOfNotNull(
+            error.message?.lowercase(),
+            error.cause?.message?.lowercase(),
+            error.cause?.cause?.message?.lowercase(),
+        )
+        return messages.any { msg -> keywords.any { keyword -> msg.contains(keyword) } }
+    }
+
+    private fun isNetworkRelatedError(error: PlaybackException): Boolean {
+        if (isExpiredUrlError(error) || isRangeNotSatisfiableError(error) || isPageReloadError(error)) {
+            return false
+        }
+        val errorCode = error.errorCode
+        if (errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
+            errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
+        ) {
+            return true
+        }
+        var cause: Throwable? = error
+        while (cause != null) {
+            if (cause is java.net.ConnectException || cause is java.net.UnknownHostException) {
+                return true
+            }
+            cause = cause.cause
+        }
+        return false
+    }
+
+    // ---- Retry tracking ----
+
+    private fun hasExceededRetryLimit(mediaId: String): Boolean {
+        return (currentMediaIdRetryCount[mediaId] ?: 0) >= MAX_RETRY_PER_SONG
+    }
+
+    private fun incrementRetryCount(mediaId: String) {
+        currentMediaIdRetryCount[mediaId] = (currentMediaIdRetryCount[mediaId] ?: 0) + 1
+    }
+
+    private fun resetRetryCount(mediaId: String) {
+        currentMediaIdRetryCount.remove(mediaId)
+        recentlyFailedSongs.remove(mediaId)
+    }
+
+    private fun markSongAsFailed(mediaId: String) {
+        recentlyFailedSongs.add(mediaId)
+        currentMediaIdRetryCount.remove(mediaId)
+
+        failedSongsClearJob?.cancel()
+        failedSongsClearJob = serviceScope.launch {
+            delay(FAILED_SONGS_CLEAR_DELAY_MS)
+            recentlyFailedSongs.clear()
+        }
+    }
+
+    // ---- Cache invalidation ----
+
+    private fun performAggressiveCacheClear(mediaId: String) {
+        youTubeMediaSourceHelper.clearUrlCache(mediaId)
+        youTubeMediaSourceHelper.clearPlayerCache(mediaId)
+        YTPlayerUtils.forceRefreshForVideo(mediaId)
+    }
+
+    // ---- Main error dispatcher ----
+
+    private fun handlePlayerError(error: PlaybackException) {
+        val player = engine.masterPlayer
+        val mediaId = player.currentMediaItem?.mediaId
+
+        // Only apply YouTube-specific recovery for YouTube content
+        if (!isYouTubeMediaId(mediaId)) {
+            Timber.tag(TAG).w("Non-YouTube playback error for mediaId=%s, skipping recovery", mediaId)
+            return
+        }
+
+        val id = mediaId!! // Safe: isYouTubeMediaId checks non-null
+
+        // Check retry limit first
+        if (hasExceededRetryLimit(id)) {
+            Timber.tag(TAG).w("Retry limit exceeded for %s. Marking as failed.", id)
+            markSongAsFailed(id)
+            handleFinalFailure()
+            return
+        }
+
+        // Clear caches aggressively for all errors
+        performAggressiveCacheClear(id)
+
+        // Dispatch by error type
+        when {
+            isRangeNotSatisfiableError(error) -> handleRangeNotSatisfiableError(id)
+            isPageReloadError(error) -> handlePageReloadError(id)
+            isExpiredUrlError(error) -> handleExpiredUrlError(id)
+            isNetworkRelatedError(error) -> handleNetworkError(id)
+            else -> handleGenericError(id)
+        }
+    }
+
+    // ---- Individual error handlers ----
+
+    private fun handleExpiredUrlError(mediaId: String) {
+        Timber.tag(TAG).d("Handling 403 (expired URL) for %s", mediaId)
+        incrementRetryCount(mediaId)
+
+        retryJob?.cancel()
+        retryJob = serviceScope.launch {
+            delay(RETRY_DELAY_MS)
+            val player = engine.masterPlayer
+            val pos = player.currentPosition
+            player.seekTo(pos) // Forces URL re-resolution
+            player.prepare()
+            player.play()
+        }
+    }
+
+    private fun handleRangeNotSatisfiableError(mediaId: String) {
+        Timber.tag(TAG).d("Handling 416 (range not satisfiable) for %s", mediaId)
+        incrementRetryCount(mediaId)
+
+        retryJob?.cancel()
+        retryJob = serviceScope.launch {
+            delay(RETRY_DELAY_MS)
+            val player = engine.masterPlayer
+            player.seekTo(0) // Reset to start to avoid range issues
+            player.prepare()
+            player.play()
+        }
+    }
+
+    private fun handlePageReloadError(mediaId: String) {
+        Timber.tag(TAG).d("Handling page reload error for %s", mediaId)
+        incrementRetryCount(mediaId)
+
+        retryJob?.cancel()
+        retryJob = serviceScope.launch {
+            delay(RETRY_DELAY_MS * 2) // Longer delay for rate-limiting
+            val player = engine.masterPlayer
+            val pos = player.currentPosition
+            player.seekTo(pos)
+            player.prepare()
+            player.play()
+        }
+    }
+
+    private fun handleNetworkError(mediaId: String) {
+        Timber.tag(TAG).d("Handling network error for %s. Waiting for connectivity.", mediaId)
+        incrementRetryCount(mediaId)
+
+        retryJob?.cancel()
+        retryJob = serviceScope.launch {
+            // Wait longer for network errors — the connection might recover
+            delay(RETRY_DELAY_MS * 3)
+            val player = engine.masterPlayer
+            val pos = player.currentPosition
+            player.seekTo(pos)
+            player.prepare()
+            player.play()
+        }
+    }
+
+    private fun handleGenericError(mediaId: String) {
+        Timber.tag(TAG).d("Handling generic IO error for %s", mediaId)
+        incrementRetryCount(mediaId)
+
+        retryJob?.cancel()
+        retryJob = serviceScope.launch {
+            delay(RETRY_DELAY_MS)
+            val player = engine.masterPlayer
+            val pos = player.currentPosition
+            player.seekTo(pos)
+            player.prepare()
+            player.play()
+        }
+    }
+
+    // ---- Final failure (retries exhausted) ----
+
+    private fun handleFinalFailure() {
+        // Auto-skip to next or stop
+        skipOnError()
+    }
+
+    private fun skipOnError() {
+        val player = engine.masterPlayer
+        consecutivePlaybackErr += 2
+
+        val nextWindowIndex = player.nextMediaItemIndex
+        if (consecutivePlaybackErr <= MAX_CONSECUTIVE_ERR && nextWindowIndex != C.INDEX_UNSET) {
+            Timber.tag(TAG).d("Skipping to next song (consecutive errors: %d)", consecutivePlaybackErr)
+            player.seekTo(nextWindowIndex, C.TIME_UNSET)
+            player.prepare()
+            player.play()
+        } else {
+            // Too many consecutive skips — force stop to prevent runaway
+            Timber.tag(TAG).w("Too many consecutive errors (%d). Stopping playback.", consecutivePlaybackErr)
+            player.pause()
+            consecutivePlaybackErr = 0
+        }
     }
 
 }

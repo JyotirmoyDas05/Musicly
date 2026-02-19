@@ -23,3 +23,4 @@ dependencyResolutionManagement {
 rootProject.name = "Musicly"
 include(":app")
 include(":baselineprofile")
+include(":innertube")

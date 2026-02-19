@@ -5,8 +5,11 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jyotirmoy.musicly.data.model.Album
+import com.jyotirmoy.musicly.data.model.MediaMetadata
+import com.jyotirmoy.musicly.data.model.OnlineAlbumDetail
 import com.jyotirmoy.musicly.data.model.Song
-import com.jyotirmoy.musicly.data.repository.MusicRepository // Importar MusicRepository
+import com.jyotirmoy.musicly.data.repository.MusicRepository
+import com.jyotirmoy.musicly.data.repository.YouTubeRepository
 import com.jyotirmoy.musicly.R
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -22,6 +25,11 @@ import javax.inject.Inject
 data class AlbumDetailUiState(
     val album: Album? = null,
     val songs: List<Song> = emptyList(),
+    /** Online album detail — set when navigating with a YouTube browseId */
+    val onlineAlbum: OnlineAlbumDetail? = null,
+    /** Online songs — set when navigating with a YouTube browseId */
+    val onlineSongs: List<MediaMetadata> = emptyList(),
+    val isOnline: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null
 )
@@ -30,6 +38,7 @@ data class AlbumDetailUiState(
 class AlbumDetailViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val musicRepository: MusicRepository,
+    private val youTubeRepository: YouTubeRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -41,9 +50,11 @@ class AlbumDetailViewModel @Inject constructor(
         if (albumIdString != null) {
             val albumId = albumIdString.toLongOrNull()
             if (albumId != null) {
+                // Local album (numeric ID from MediaStore)
                 loadAlbumData(albumId)
             } else {
-                _uiState.update { it.copy(error = context.getString(R.string.invalid_album_id), isLoading = false) }
+                // Online album (YouTube browseId like "MPREb_...")
+                loadOnlineAlbumData(albumIdString)
             }
         } else {
             _uiState.update { it.copy(error = context.getString(R.string.album_id_not_found), isLoading = false) }
@@ -91,6 +102,33 @@ class AlbumDetailViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    private fun loadOnlineAlbumData(browseId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null, isOnline = true) }
+
+            youTubeRepository.getAlbumDetails(browseId).fold(
+                onSuccess = { detail ->
+                    _uiState.update {
+                        it.copy(
+                            onlineAlbum = detail,
+                            onlineSongs = detail.songs,
+                            isLoading = false,
+                            isOnline = true,
+                        )
+                    }
+                },
+                onFailure = { e ->
+                    _uiState.update {
+                        it.copy(
+                            error = "Failed to load album: ${e.localizedMessage ?: "Unknown error"}",
+                            isLoading = false,
+                        )
+                    }
+                }
+            )
         }
     }
 

@@ -17,6 +17,7 @@ import com.jyotirmoy.musicly.data.database.FavoritesDao
 import com.jyotirmoy.musicly.data.database.LyricsDao
 import com.jyotirmoy.musicly.data.database.MusicDao
 import com.jyotirmoy.musicly.data.database.MusiclyDatabase
+import com.jyotirmoy.musicly.data.database.OnlineDao
 import com.jyotirmoy.musicly.data.database.SearchHistoryDao
 import com.jyotirmoy.musicly.data.database.TransitionDao
 import com.jyotirmoy.musicly.data.preferences.UserPreferencesRepository
@@ -91,7 +92,8 @@ object AppModule {
             MusiclyDatabase.MIGRATION_11_12,
             MusiclyDatabase.MIGRATION_12_13,
             MusiclyDatabase.MIGRATION_13_14,
-            MusiclyDatabase.MIGRATION_14_15
+            MusiclyDatabase.MIGRATION_14_15,
+            MusiclyDatabase.MIGRATION_15_16
         ).fallbackToDestructiveMigration(dropAllTables = true)
             .build()
     }
@@ -136,6 +138,12 @@ object AppModule {
     @Provides
     fun provideLyricsDao(database: MusiclyDatabase): LyricsDao {
         return database.lyricsDao()
+    }
+
+    @Singleton
+    @Provides
+    fun provideOnlineDao(database: MusiclyDatabase): OnlineDao {
+        return database.onlineDao()
     }
 
     @Provides

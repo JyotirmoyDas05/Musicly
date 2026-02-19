@@ -36,6 +36,9 @@ jobs:
 
       - name: Build debug APK
         run: ./gradlew assembleDebug
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          POTOKEN_REQUEST_KEY: ${{ secrets.POTOKEN_REQUEST_KEY }}
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

@@ -55,6 +55,8 @@ import com.jyotirmoy.musicly.data.model.SearchFilterType
 import com.jyotirmoy.musicly.data.model.Song
 import com.jyotirmoy.musicly.data.model.SortOption
 import com.jyotirmoy.musicly.data.model.toLibraryTabIdOrNull
+import com.jyotirmoy.musicly.data.model.MediaMetadata as AppMediaMetadata
+import com.jyotirmoy.musicly.data.model.toMediaItem
 import com.jyotirmoy.musicly.data.preferences.CarouselStyle
 import com.jyotirmoy.musicly.data.preferences.LibraryNavigationMode
 import com.jyotirmoy.musicly.data.preferences.NavBarStyle
@@ -1335,6 +1337,115 @@ class PlayerViewModel @Inject constructor(
         showAndPlaySong(song, listOf(song), "Library")
     }
 
+     /**
+      * Play an online song from YouTube Music.
+      *
+      * Directly creates [MediaItem] objects from [AppMediaMetadata] following the Metrolist pattern:
+      * - URI is set to just the video ID (not a full URL)
+      * - customCacheKey is set to the video ID
+      * - ResolvingDataSource will extract mediaId and resolve it to a stream URL
+      */
+    fun playOnlineSong(
+        metadata: AppMediaMetadata,
+        contextMetadata: List<AppMediaMetadata>,
+        queueName: String = "Online"
+    ) {
+        viewModelScope.launch {
+            transitionSchedulerJob?.cancel()
+
+            // Convert MediaMetadata to MediaItems (Metrolist pattern)
+            val mediaItems = contextMetadata.map { it.toMediaItem() }
+            
+            if (mediaItems.isEmpty()) {
+                _toastEvents.emit(context.getString(R.string.no_valid_songs))
+                return@launch
+            }
+
+            // Find the start index
+            val startIndex = mediaItems.indexOfFirst { it.mediaId == metadata.id }.coerceAtLeast(0)
+
+            // Update queue state (for UI consistency)
+            queueStateHolder.saveOriginalQueueState(
+                contextMetadata.map { it.toPlayableSong() },
+                queueName
+            )
+
+            // Check if shuffle is currently active
+            val isPersistent = userPreferencesRepository.persistentShuffleEnabledFlow.first()
+            val isShuffleOn = playbackStateHolder.stablePlayerState.value.isShuffleEnabled
+
+            // Reset shuffle if not persistent
+            if (!isPersistent) {
+                playbackStateHolder.updateStablePlayerState { it.copy(isShuffleEnabled = false) }
+            }
+
+            // If shuffle is persistent and ON, shuffle the items
+            val finalMediaItems = if (isPersistent && isShuffleOn) {
+                // Shuffle but keep the selected song in its position or first
+                withContext(Dispatchers.Default) {
+                    val shuffled = mediaItems.shuffled()
+                    // Move selected song to first position
+                    val selectedIndex = shuffled.indexOfFirst { it.mediaId == metadata.id }
+                    if (selectedIndex > 0) {
+                        val mutable = shuffled.toMutableList()
+                        mutable[0] = shuffled[selectedIndex].also { mutable[selectedIndex] = shuffled[0] }
+                        mutable
+                    } else {
+                        shuffled
+                    }
+                }
+            } else {
+                mediaItems
+            }
+
+            _playerUiState.update { it.copy(isLoadingInitialSongs = true) }
+            _isSheetVisible.value = true
+
+            // Prepare and play using direct engine access
+            val enginePlayer = dualPlayerEngine.masterPlayer
+            if (finalMediaItems.isNotEmpty()) {
+                val finalStartIndex = finalMediaItems.indexOfFirst { it.mediaId == metadata.id }.coerceAtLeast(0)
+                enginePlayer.setMediaItems(finalMediaItems, finalStartIndex, 0L)
+                enginePlayer.prepare()
+                enginePlayer.play()
+            }
+
+            _playerUiState.update { it.copy(isLoadingInitialSongs = false) }
+        }
+    }
+
+    /**
+     * Converts an [AppMediaMetadata] (online or local) into a [Song] suitable for queue state storage.
+     *
+     * This is used internally for maintaining queue state, not for actual playback.
+     * For playback, use [toMediaItem] which creates proper [MediaItem] objects.
+     */
+    private fun AppMediaMetadata.toPlayableSong(): Song {
+        val durationMs = (duration ?: 0) * 1000L
+        return Song(
+            id = id,
+            title = title,
+            artist = displayArtist,
+            artistId = -1L,
+            artists = artists.map {
+                com.jyotirmoy.musicly.data.model.ArtistRef(
+                    id = it.id?.toLongOrNull() ?: -1L,
+                    name = it.name,
+                    isPrimary = false
+                )
+            },
+            album = album?.title ?: "",
+            albumId = album?.id?.toLongOrNull() ?: -1L,
+            path = "",
+            contentUriString = contentUri ?: "https://music.youtube.com/watch?v=$id",
+            albumArtUriString = thumbnailUrl,
+            duration = durationMs,
+            mimeType = null,
+            bitrate = null,
+            sampleRate = null
+        )
+    }
+
     private fun List<Song>.matchesSongOrder(contextSongs: List<Song>): Boolean {
         if (size != contextSongs.size) return false
         return indices.all { this[it].id == contextSongs[it].id }
@@ -2139,9 +2250,21 @@ class PlayerViewModel @Inject constructor(
                         metadataBuilder.setArtworkUri(uri)
                     }
                     val metadata = metadataBuilder.build()
+                    
+                    // For YouTube songs, use the video ID as URI so ResolvingDataSource can resolve it
+                    // For local songs, use the full content URI
+                    val uri = if (song.contentUriString?.startsWith("https://music.youtube.com") == true) {
+                        // Extract video ID from YouTube URL for resolution
+                        song.id.toUri()
+                    } else {
+                        // Use full URI for local songs
+                        song.contentUriString.toUri()
+                    }
+                    
                     MediaItem.Builder()
                         .setMediaId(song.id)
-                        .setUri(song.contentUriString.toUri())
+                        .setUri(uri)
+                        .setCustomCacheKey(song.id)  // Ensure cache key matches for ResolvingDataSource
                         .setMediaMetadata(metadata)
                         .build()
                 }
@@ -2191,7 +2314,16 @@ class PlayerViewModel @Inject constructor(
 
         val mediaItem = MediaItem.Builder()
             .setMediaId(song.id)
-            .setUri(song.contentUriString.toUri())
+            .setUri(
+                // For YouTube songs, use the video ID as URI so ResolvingDataSource can resolve it
+                // For local songs, use the full content URI
+                if (song.contentUriString?.startsWith("https://music.youtube.com") == true) {
+                    song.id.toUri()
+                } else {
+                    song.contentUriString.toUri()
+                }
+            )
+            .setCustomCacheKey(song.id)  // Ensure cache key matches for ResolvingDataSource
             .setMediaMetadata(MediaItemBuilder.build(song).mediaMetadata)
             .build()
         if (controller.currentMediaItem?.mediaId == song.id) {

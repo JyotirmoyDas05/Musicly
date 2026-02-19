@@ -46,6 +46,9 @@ import com.jyotirmoy.musicly.presentation.screens.PlaylistDetailScreen
 import com.jyotirmoy.musicly.presentation.screens.RecentlyPlayedScreen
 
 import com.jyotirmoy.musicly.presentation.screens.AboutScreen
+import com.jyotirmoy.musicly.presentation.screens.ExploreScreen
+import com.jyotirmoy.musicly.presentation.screens.MoodPlaylistsScreen
+import com.jyotirmoy.musicly.presentation.screens.OnlinePlaylistScreen
 import com.jyotirmoy.musicly.presentation.screens.SearchScreen
 import com.jyotirmoy.musicly.presentation.screens.StatsScreen
 import com.jyotirmoy.musicly.presentation.screens.SettingsScreen
@@ -117,6 +120,45 @@ fun AppNavigation(
                         paddingValuesParent = paddingValues, 
                         playerViewModel = playerViewModel,
                         onOpenSidebar = onOpenSidebar
+                    )
+                }
+            }
+            composable(
+                Screen.Explore.route,
+                enterTransition = {
+                    mainRootEnterTransition(
+                        fromRoute = initialState.destination.route,
+                        toRoute = targetState.destination.route,
+                        fallback = enterTransition()
+                    )
+                },
+                exitTransition = {
+                    mainRootExitTransition(
+                        fromRoute = initialState.destination.route,
+                        toRoute = targetState.destination.route,
+                        fallback = exitTransition()
+                    )
+                },
+                popEnterTransition = {
+                    mainRootEnterTransition(
+                        fromRoute = initialState.destination.route,
+                        toRoute = targetState.destination.route,
+                        fallback = popEnterTransition()
+                    )
+                },
+                popExitTransition = {
+                    mainRootExitTransition(
+                        fromRoute = initialState.destination.route,
+                        toRoute = targetState.destination.route,
+                        fallback = popExitTransition()
+                    )
+                },
+            ) {
+                ScreenWrapper(navController = navController) {
+                    ExploreScreen(
+                        navController = navController,
+                        paddingValues = paddingValues,
+                        playerViewModel = playerViewModel
                     )
                 }
             }
@@ -473,11 +515,60 @@ fun AppNavigation(
                     )
                 }
             }
+            composable(
+                route = Screen.MoodDetail.route,
+                arguments = listOf(
+                    navArgument("browseId") { type = NavType.StringType },
+                    navArgument("title") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument("color") {
+                        type = NavType.LongType
+                        defaultValue = 0L
+                    },
+                    navArgument("params") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                ),
+                enterTransition = { enterTransition() },
+                exitTransition = { exitTransition() },
+                popEnterTransition = { popEnterTransition() },
+                popExitTransition = { popExitTransition() },
+            ) { backStackEntry ->
+                val moodColor = backStackEntry.arguments?.getLong("color") ?: 0L
+                ScreenWrapper(navController = navController) {
+                    MoodPlaylistsScreen(
+                        navController = navController,
+                        playerViewModel = playerViewModel,
+                        moodColor = moodColor,
+                    )
+                }
+            }
+            composable(
+                route = Screen.OnlinePlaylistDetail.route,
+                arguments = listOf(
+                    navArgument("playlistId") { type = NavType.StringType },
+                ),
+                enterTransition = { enterTransition() },
+                exitTransition = { exitTransition() },
+                popEnterTransition = { popEnterTransition() },
+                popExitTransition = { popExitTransition() },
+            ) {
+                ScreenWrapper(navController = navController) {
+                    OnlinePlaylistScreen(
+                        navController = navController,
+                        playerViewModel = playerViewModel,
+                    )
+                }
+            }
         }
     }
 }
 
 private fun String.toRoute(): String = when (this) {
+    LaunchTab.EXPLORE -> Screen.Explore.route
     LaunchTab.SEARCH -> Screen.Search.route
     LaunchTab.LIBRARY -> Screen.Library.route
     else -> Screen.Home.route
@@ -506,8 +597,9 @@ private fun mainRootDirection(
 
 private fun mainRootRouteIndex(route: String?): Int? = when (route) {
     Screen.Home.route -> 0
-    Screen.Search.route -> 1
-    Screen.Library.route -> 2
+    Screen.Explore.route -> 1
+    Screen.Search.route -> 2
+    Screen.Library.route -> 3
     else -> null
 }
 

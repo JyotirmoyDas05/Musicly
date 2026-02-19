@@ -8,8 +8,10 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -47,9 +49,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavController
 import com.jyotirmoy.musicly.data.model.Artist
+import com.jyotirmoy.musicly.data.model.MediaArtist
+import com.jyotirmoy.musicly.data.model.MediaMetadata as AppMediaMetadata
+import com.jyotirmoy.musicly.data.model.OnlineArtistDetail
+import com.jyotirmoy.musicly.data.model.OnlineArtistSection
+import com.jyotirmoy.musicly.data.model.OnlineContentItem
 import com.jyotirmoy.musicly.presentation.components.MiniPlayerHeight
 import com.jyotirmoy.musicly.presentation.components.NavBarContentHeight
 import com.jyotirmoy.musicly.presentation.components.PlaylistBottomSheet
+import com.jyotirmoy.musicly.presentation.components.SmartImage
 import com.jyotirmoy.musicly.presentation.components.SongInfoBottomSheet
 import com.jyotirmoy.musicly.presentation.navigation.Screen
 import com.jyotirmoy.musicly.presentation.viewmodel.ArtistDetailViewModel
@@ -173,12 +181,12 @@ fun ArtistDetailScreen(
     ) {
         Box(modifier = Modifier.nestedScroll(nestedScrollConnection)) {
             when {
-                uiState.isLoading && uiState.artist == null -> {
+                uiState.isLoading && uiState.artist == null && uiState.onlineArtist == null -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         ContainedLoadingIndicator()
                     }
                 }
-                uiState.error != null && uiState.artist == null -> {
+                uiState.error != null && uiState.artist == null && uiState.onlineArtist == null -> {
                     Box(
                         modifier = Modifier.fillMaxSize().padding(16.dp),
                         contentAlignment = Alignment.Center
@@ -189,6 +197,109 @@ fun ArtistDetailScreen(
                             style = MaterialTheme.typography.bodyLarge
                         )
                     }
+                }
+                uiState.onlineArtist != null -> {
+                    val onlineArtist = uiState.onlineArtist!!
+                    val onlineSections = uiState.onlineSections
+                    val currentTopBarHeightDp = with(density) { topBarHeight.value.toDp() }
+
+                    LazyColumn(
+                        state = lazyListState,
+                        contentPadding = PaddingValues(
+                            top = currentTopBarHeightDp,
+                            bottom = MiniPlayerHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 8.dp
+                        ),
+                        modifier = Modifier
+                            .fillMaxSize()
+                    ) {
+                        // Description section
+                        onlineArtist.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                            item(key = "online_artist_desc") {
+                                Text(
+                                    text = desc,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
+                                    maxLines = 4,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        onlineSections.forEachIndexed { sectionIndex, section ->
+                            if (section.items.isEmpty()) return@forEachIndexed
+
+                            stickyHeader(key = "online_artist_section_${sectionIndex}_header") {
+                                OnlineArtistSectionHeader(
+                                    title = section.title,
+                                    itemCount = section.items.size,
+                                )
+                            }
+
+                            item(key = "online_artist_section_${sectionIndex}_spacing") {
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+
+                            itemsIndexed(
+                                items = section.items,
+                                key = { idx, item -> "online_artist_section_${sectionIndex}_item_${item.id}_$idx" }
+                            ) { itemIndex, item ->
+                                OnlineArtistContentItem(
+                                    item = item,
+                                    isCurrentSong = (item is OnlineContentItem.SongContent) &&
+                                            stablePlayerState.currentSong?.id == item.id,
+                                    isPlaying = stablePlayerState.isPlaying,
+                                    onSongClick = { songItem ->
+                                        val allSongsInSection = section.items.filterIsInstance<OnlineContentItem.SongContent>()
+                                        val metadataList = allSongsInSection.map { it.toMediaMetadata() }
+                                        val clickedMetadata = songItem.toMediaMetadata()
+                                        playerViewModel.playOnlineSong(clickedMetadata, metadataList, "${onlineArtist.name} - ${section.title}")
+                                    },
+                                    onAlbumClick = { albumItem ->
+                                        navController.navigate(Screen.AlbumDetail.createRoute(albumItem.browseId))
+                                    },
+                                    onArtistClick = { artistItem ->
+                                        navController.navigate(Screen.ArtistDetail.createRoute(artistItem.id))
+                                    },
+                                    onPlaylistClick = { playlistItem ->
+                                        navController.navigate(Screen.OnlinePlaylistDetail.createRoute(playlistItem.id))
+                                    },
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+
+                                if (itemIndex != section.items.lastIndex) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
+                            }
+
+                            item(key = "online_artist_section_${sectionIndex}_footer_spacing") {
+                                Spacer(
+                                    modifier = Modifier.height(
+                                        if (sectionIndex == onlineSections.lastIndex) 24.dp else 20.dp
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    OnlineArtistCollapsingTopBar(
+                        onlineArtist = onlineArtist,
+                        collapseFraction = collapseFraction,
+                        headerHeight = currentTopBarHeightDp,
+                        onBackPressed = { navController.popBackStack() },
+                        onPlayClick = {
+                            // Play the first song section's songs
+                            val firstSongSection = onlineSections.firstOrNull { sec ->
+                                sec.items.any { it is OnlineContentItem.SongContent }
+                            }
+                            val songs = firstSongSection?.items
+                                ?.filterIsInstance<OnlineContentItem.SongContent>()
+                                ?.map { it.toMediaMetadata() }
+                            if (!songs.isNullOrEmpty()) {
+                                playerViewModel.playOnlineSong(songs.random(), songs, onlineArtist.name)
+                            }
+                        }
+                    )
                 }
                 uiState.artist != null -> {
                     val artist = uiState.artist!!
@@ -336,6 +447,340 @@ fun ArtistDetailScreen(
                 )
             }
         }
+    }
+}
+
+// ---- Private File-Level Composables ----
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun OnlineArtistCollapsingTopBar(
+    onlineArtist: OnlineArtistDetail,
+    collapseFraction: Float,
+    headerHeight: Dp,
+    onBackPressed: () -> Unit,
+    onPlayClick: () -> Unit
+) {
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val statusBarColor = if (LocalMusiclyDarkTheme.current) Color.Black.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.4f)
+
+    val fabScale = 1f - collapseFraction
+    val backgroundAlpha = collapseFraction
+    val headerContentAlpha = 1f - (collapseFraction * 2).coerceAtMost(1f)
+
+    val titleScale = lerp(1f, 0.75f, collapseFraction)
+    val titlePaddingStart = lerp(24.dp, 58.dp, collapseFraction)
+    val titleMaxLines = if (collapseFraction < 0.5f) 2 else 1
+    val titleVerticalBias = lerp(1f, -1f, collapseFraction)
+    val animatedTitleAlignment = BiasAlignment(horizontalBias = -1f, verticalBias = titleVerticalBias)
+    val titleContainerHeight = lerp(88.dp, 56.dp, collapseFraction)
+    val yOffsetCorrection = lerp((titleContainerHeight / 2) - 64.dp, 0.dp, collapseFraction)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(headerHeight)
+            .background(surfaceColor.copy(alpha = backgroundAlpha))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = headerContentAlpha }
+        ) {
+            if (!onlineArtist.thumbnailUrl.isNullOrEmpty()) {
+                SmartImage(
+                    model = onlineArtist.thumbnailUrl,
+                    contentDescription = onlineArtist.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                MusicIconPattern(
+                    modifier = Modifier.fillMaxSize(),
+                    collapseFraction = collapseFraction
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0.3f to Color.Transparent,
+                                1f to MaterialTheme.colorScheme.surface
+                            )
+                        )
+                    )
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(80.dp)
+                .background(Brush.verticalGradient(colors = listOf(statusBarColor, Color.Transparent)))
+                .align(Alignment.TopCenter)
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+        ) {
+            FilledIconButton(
+                modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 4.dp),
+                onClick = onBackPressed,
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+            ) {
+                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+
+            Box(
+                modifier = Modifier
+                    .align(animatedTitleAlignment)
+                    .height(titleContainerHeight)
+                    .fillMaxWidth()
+                    .offset(y = yOffsetCorrection)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = titlePaddingStart, end = 120.dp)
+                        .graphicsLayer {
+                            scaleX = titleScale
+                            scaleY = titleScale
+                        },
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = onlineArtist.name,
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontSize = 26.sp,
+                            textGeometricTransform = TextGeometricTransform(scaleX = 1.2f),
+                        ),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = titleMaxLines,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    onlineArtist.subscriberCountText?.let { subscribers ->
+                        Text(
+                            text = subscribers,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            LargeExtendedFloatingActionButton(
+                onClick = onPlayClick,
+                shape = RoundedStarShape(sides = 8, curve = 0.05, rotation = 0f),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .graphicsLayer {
+                        scaleX = fabScale
+                        scaleY = fabScale
+                        alpha = fabScale
+                    }
+            ) {
+                Icon(Icons.Rounded.Shuffle, contentDescription = "Shuffle play")
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnlineArtistSectionHeader(
+    title: String,
+    itemCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = Color.Transparent,
+        tonalElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp, horizontal = 22.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "$itemCount items",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnlineArtistContentItem(
+    item: OnlineContentItem,
+    isCurrentSong: Boolean,
+    isPlaying: Boolean,
+    onSongClick: (OnlineContentItem.SongContent) -> Unit,
+    onAlbumClick: (OnlineContentItem.AlbumContent) -> Unit,
+    onArtistClick: (OnlineContentItem.ArtistContent) -> Unit,
+    onPlaylistClick: (OnlineContentItem.PlaylistContent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    when (item) {
+        is OnlineContentItem.SongContent -> {
+            Row(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .clickable { onSongClick(item) }
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SmartImage(
+                    model = item.thumbnailUrl,
+                    contentDescription = item.title,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (isCurrentSong) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isCurrentSong) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = buildString {
+                            append(item.artists.joinToString(", ") { it.name })
+                            item.duration?.let { dur ->
+                                append(" • ${dur / 60}:${"%02d".format(dur % 60)}")
+                            }
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        is OnlineContentItem.AlbumContent -> {
+            Row(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .clickable { onAlbumClick(item) }
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SmartImage(
+                    model = item.thumbnailUrl,
+                    contentDescription = item.title,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                    modifier = Modifier.size(56.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = buildString {
+                            append(item.artists.joinToString(", ") { it.name })
+                            item.year?.let { append(" • $it") }
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        is OnlineContentItem.ArtistContent -> {
+            Row(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .clickable { onArtistClick(item) }
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SmartImage(
+                    model = item.thumbnailUrl,
+                    contentDescription = item.title,
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+        is OnlineContentItem.PlaylistContent -> {
+            Row(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .clickable { onPlaylistClick(item) }
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SmartImage(
+                    model = item.thumbnailUrl,
+                    contentDescription = item.title,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                    modifier = Modifier.size(56.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    item.author?.let { author ->
+                        Text(
+                            text = author,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+        is OnlineContentItem.MoodContent -> { /* Not applicable in artist detail */ }
     }
 }
 
@@ -590,4 +1035,19 @@ private fun MusicIconPattern(modifier: Modifier = Modifier, collapseFraction: Fl
             modifier = Modifier.align(Alignment.Center).offset(x = lerp(60.dp, 80.dp, collapseFraction), y = lerp(20.dp, 60.dp, collapseFraction)).size(45.dp).graphicsLayer { rotationZ = lerp(-25f, 15f, collapseFraction); scaleX = 1f - collapseFraction; scaleY = 1f - collapseFraction }
         )
     }
+}
+
+// ---- Extension Functions ----
+
+fun OnlineContentItem.SongContent.toMediaMetadata(): AppMediaMetadata {
+    return AppMediaMetadata(
+        id = id,
+        title = title,
+        artists = artists,
+        album = null,
+        duration = duration,
+        thumbnailUrl = thumbnailUrl,
+        explicit = explicit,
+        isLocal = false,
+    )
 }

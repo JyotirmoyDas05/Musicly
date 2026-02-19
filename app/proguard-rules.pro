@@ -142,3 +142,23 @@
 -dontwarn org.eclipse.jetty.npn.NextProtoNego$Provider
 -dontwarn org.eclipse.jetty.npn.NextProtoNego$ServerProvider
 -dontwarn org.eclipse.jetty.npn.NextProtoNego
+
+# Keep classes needed by org.jsoup
+-keep class com.google.re2j.** { *; }
+-dontwarn com.google.re2j.**
+
+# Keep classes needed by Rhino scripting engine
+-keep class javax.script.** { *; }
+-keep class org.mozilla.javascript.** { *; }
+-keep class java.beans.** { *; }
+-dontwarn javax.script.**
+-dontwarn org.mozilla.javascript.**
+-dontwarn java.beans.**
+
+# Keep OkHttp internal classes
+-keep class okhttp3.internal.** { *; }
+-dontwarn okhttp3.internal.**
+
+# Keep jsoup classes
+-keep class org.jsoup.** { *; }
+-dontwarn org.jsoup.**

@@ -5,12 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.0-beta] - 2026-02-15
+## [0.7.0-beta] - 2026-02-19
+
+### Added
+
+- Full YouTube Music online playlist integration (feat: @Jyotirmoy)
+- Online playlist detail screen with M3 Expressive design (feat: @Jyotirmoy)
+- Background playlist song pre-loading for seamless playback (feat: @Jyotirmoy)
+
+### Changed
+
+- Implemented Metrolist-pattern online song playback for proper stream resolution (refactor: @Jyotirmoy)
+- Direct MediaItem creation from MediaMetadata for online content (refactor: @Jyotirmoy)
+- Improved queue state management for online playlists (feat: @Jyotirmoy)
 
 ### Fixed
 
-- Resolved build failure due to duplicate native libraries.
-- Improved automated release workflow.
+- Fixed online song playback skipping issues by correcting MediaItem URI format (fix: @Jyotirmoy)
+- Resolved YouTubeMediaSourceHelper stream resolution by ensuring proper video ID detection (fix: @Jyotirmoy)
+- Fixed MediaItem customCacheKey configuration for proper ResolvingDataSource integration (fix: @Jyotirmoy)
+- Resolved build failure due to duplicate native libraries (fix: @Jyotirmoy)
+- Improved automated release workflow (fix: @Jyotirmoy)
 
 ## [0.6.0-beta] - 2026-02-15
 

@@ -22,3 +22,17 @@ annotation class FastOkHttpClient
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class BackupGson
+
+/**
+ * Qualifier for ExoPlayer streaming cache (write-through, for buffering online playback).
+ */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class PlayerCache
+
+/**
+ * Qualifier for ExoPlayer download cache (for explicitly downloaded/saved songs).
+ */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class DownloadCache

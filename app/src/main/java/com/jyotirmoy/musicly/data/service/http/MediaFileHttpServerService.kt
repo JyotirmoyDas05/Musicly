@@ -57,7 +57,7 @@ class MediaFileHttpServerService : Service() {
     @Inject
     lateinit var musicRepository: MusicRepository
 
-    private var server: ApplicationEngine? = null
+    private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
     @Volatile
     private var startInProgress = false
     private val serverStartLock = Any()
@@ -207,7 +207,7 @@ class MediaFileHttpServerService : Service() {
 
     private fun startServer() {
         synchronized(serverStartLock) {
-            if (server?.application?.isActive == true || startInProgress) {
+            if (server != null || startInProgress) {
                 return
             }
             startInProgress = true

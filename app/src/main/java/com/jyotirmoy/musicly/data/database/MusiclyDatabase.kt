@@ -17,9 +17,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SongArtistCrossRef::class,
         SongEngagementEntity::class,
         FavoritesEntity::class,
-        LyricsEntity::class
+        LyricsEntity::class,
+        OnlineSongEntity::class,
+        FormatCacheEntity::class,
+        OnlineSearchHistoryEntity::class,
     ],
-    version = 15, // Incremented version for full album-art color roles + palette style cache key
+    version = 16, // Added online music entities (online_songs, online_format_cache, online_search_history)
     exportSchema = false
 )
 abstract class MusiclyDatabase : RoomDatabase() {
@@ -29,7 +32,8 @@ abstract class MusiclyDatabase : RoomDatabase() {
     abstract fun transitionDao(): TransitionDao
     abstract fun engagementDao(): EngagementDao
     abstract fun favoritesDao(): FavoritesDao
-    abstract fun lyricsDao(): LyricsDao // Added FavoritesDao
+    abstract fun lyricsDao(): LyricsDao
+    abstract fun onlineDao(): OnlineDao
 
     companion object {
         val MIGRATION_3_4 = object : Migration(3, 4) {
@@ -177,6 +181,61 @@ abstract class MusiclyDatabase : RoomDatabase() {
 
                 // The table is a cache; wipe stale rows so we always regenerate with full token data.
                 database.execSQL("DELETE FROM album_art_themes")
+            }
+        }
+
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Create online_songs table for caching YouTube Music tracks
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS online_songs (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        artists_text TEXT NOT NULL,
+                        artists_json TEXT NOT NULL,
+                        album_id TEXT DEFAULT NULL,
+                        album_name TEXT DEFAULT NULL,
+                        duration INTEGER DEFAULT NULL,
+                        thumbnail_url TEXT DEFAULT NULL,
+                        explicit INTEGER NOT NULL DEFAULT 0,
+                        in_library INTEGER NOT NULL DEFAULT 0,
+                        is_favorite INTEGER NOT NULL DEFAULT 0,
+                        total_play_time_ms INTEGER NOT NULL DEFAULT 0,
+                        play_count INTEGER NOT NULL DEFAULT 0,
+                        last_played_timestamp INTEGER NOT NULL DEFAULT 0,
+                        date_added INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_online_songs_title ON online_songs(title)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_online_songs_album_id ON online_songs(album_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_online_songs_in_library ON online_songs(in_library)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_online_songs_last_played_timestamp ON online_songs(last_played_timestamp)")
+
+                // Create online_format_cache table for caching resolved stream URLs
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS online_format_cache (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        itag INTEGER DEFAULT NULL,
+                        mime_type TEXT DEFAULT NULL,
+                        bitrate INTEGER DEFAULT NULL,
+                        sample_rate INTEGER DEFAULT NULL,
+                        content_length INTEGER DEFAULT NULL,
+                        loudness_db REAL DEFAULT NULL,
+                        playback_url TEXT DEFAULT NULL,
+                        expires_at INTEGER NOT NULL DEFAULT 0,
+                        cached_at INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+
+                // Create online_search_history table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS online_search_history (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `query` TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_online_search_history_query ON online_search_history(`query`)")
             }
         }
     }

@@ -75,7 +75,15 @@ import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavController
 import coil.size.Size
 import com.jyotirmoy.musicly.R
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.jyotirmoy.musicly.data.model.Album
+import com.jyotirmoy.musicly.data.model.MediaMetadata as AppMediaMetadata
+import com.jyotirmoy.musicly.data.model.OnlineAlbumDetail
 import com.jyotirmoy.musicly.presentation.components.ExpressiveScrollBar
 import com.jyotirmoy.musicly.presentation.components.MiniPlayerHeight
 import com.jyotirmoy.musicly.presentation.components.NavBarContentHeight
@@ -113,7 +121,8 @@ fun AlbumDetailScreen(
     var showPlaylistBottomSheet by remember { mutableStateOf(false) }
     val isDarkTheme = LocalMusiclyDarkTheme.current
     val baseColorScheme = MaterialTheme.colorScheme
-    val albumArtUri = uiState.album?.albumArtUriString?.takeIf { it.isNotBlank() }
+    val albumArtUri = (uiState.album?.albumArtUriString?.takeIf { it.isNotBlank() }
+        ?: uiState.onlineAlbum?.thumbnailUrl)
     val albumColorSchemeFlow = remember(albumArtUri) {
         albumArtUri?.let { playerViewModel.themeStateHolder.getAlbumColorSchemeFlow(it) }
     }
@@ -141,13 +150,13 @@ fun AlbumDetailScreen(
         )
 
         when {
-            uiState.isLoading && uiState.album == null -> {
+            uiState.isLoading && uiState.album == null && uiState.onlineAlbum == null -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     ContainedLoadingIndicator()
                 }
             }
 
-            uiState.error != null && uiState.album == null -> {
+            uiState.error != null && uiState.album == null && uiState.onlineAlbum == null -> {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -158,6 +167,150 @@ fun AlbumDetailScreen(
                         text = uiState.error!!,
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
+
+            uiState.onlineAlbum != null -> {
+                val onlineAlbum = uiState.onlineAlbum!!
+                val onlineSongs = uiState.onlineSongs
+                val lazyListState = rememberLazyListState()
+
+                val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+                val minTopBarHeight = 64.dp + statusBarHeight
+                val maxTopBarHeight = 300.dp
+
+                val minTopBarHeightPx = with(density) { minTopBarHeight.toPx() }
+                val maxTopBarHeightPx = with(density) { maxTopBarHeight.toPx() }
+
+                val topBarHeight = remember { Animatable(maxTopBarHeightPx) }
+                var collapseFraction by remember { mutableFloatStateOf(0f) }
+
+                LaunchedEffect(topBarHeight.value) {
+                    collapseFraction =
+                        1f - ((topBarHeight.value - minTopBarHeightPx) / (maxTopBarHeightPx - minTopBarHeightPx)).coerceIn(
+                            0f,
+                            1f
+                        )
+                }
+
+                val nestedScrollConnection = remember {
+                    object : NestedScrollConnection {
+                        override fun onPreScroll(
+                            available: Offset,
+                            source: NestedScrollSource
+                        ): Offset {
+                            val delta = available.y
+                            val isScrollingDown = delta < 0
+
+                            if (!isScrollingDown && (lazyListState.firstVisibleItemIndex > 0 || lazyListState.firstVisibleItemScrollOffset > 0)) {
+                                return Offset.Zero
+                            }
+
+                            val previousHeight = topBarHeight.value
+                            val newHeight =
+                                (previousHeight + delta).coerceIn(minTopBarHeightPx, maxTopBarHeightPx)
+                            val consumed = newHeight - previousHeight
+
+                            if (consumed.roundToInt() != 0) {
+                                coroutineScope.launch {
+                                    topBarHeight.snapTo(newHeight)
+                                }
+                            }
+
+                            val canConsumeScroll = !(isScrollingDown && newHeight == minTopBarHeightPx)
+                            return if (canConsumeScroll) Offset(0f, consumed) else Offset.Zero
+                        }
+
+                        override suspend fun onPostFling(
+                            consumed: Velocity,
+                            available: Velocity
+                        ): Velocity {
+                            return super.onPostFling(consumed, available)
+                        }
+                    }
+                }
+
+                LaunchedEffect(lazyListState.isScrollInProgress) {
+                    if (!lazyListState.isScrollInProgress) {
+                        val shouldExpand =
+                            topBarHeight.value > (minTopBarHeightPx + maxTopBarHeightPx) / 2
+                        val canExpand =
+                            lazyListState.firstVisibleItemIndex == 0 && lazyListState.firstVisibleItemScrollOffset == 0
+
+                        val targetValue = if (shouldExpand && canExpand) {
+                            maxTopBarHeightPx
+                        } else {
+                            minTopBarHeightPx
+                        }
+
+                        if (topBarHeight.value != targetValue) {
+                            coroutineScope.launch {
+                                topBarHeight.animateTo(
+                                    targetValue,
+                                    spring(stiffness = Spring.StiffnessMedium)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            color = MaterialTheme.colorScheme.surface
+                        )
+                        .nestedScroll(nestedScrollConnection)
+                ) {
+                    val currentTopBarHeightDp = with(density) { topBarHeight.value.toDp() }
+                    LazyColumn(
+                        state = lazyListState,
+                        contentPadding = PaddingValues(
+                            top = currentTopBarHeightDp,
+                            start = 16.dp,
+                            end = if ((lazyListState.canScrollForward || lazyListState.canScrollBackward) && collapseFraction > 0.95f) 24.dp else 16.dp,
+                            bottom = fabBottomPadding + 80.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                    ) {
+                        items(onlineSongs, key = { meta -> "online_album_song_${meta.id}" }) { meta ->
+                            OnlineAlbumSongItem(
+                                metadata = meta,
+                                isCurrentSong = stablePlayerState.currentSong?.id == meta.id,
+                                isPlaying = stablePlayerState.isPlaying,
+                                onClick = {
+                                    playerViewModel.playOnlineSong(meta, onlineSongs, onlineAlbum.title)
+                                }
+                            )
+                        }
+                    }
+
+                    if (collapseFraction > 0.95f) {
+                        ExpressiveScrollBar(
+                            listState = lazyListState,
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(
+                                    top = currentTopBarHeightDp + 12.dp,
+                                    bottom = fabBottomPadding + 80.dp
+                                )
+                        )
+                    }
+
+                    CollapsingOnlineAlbumTopBar(
+                        onlineAlbum = onlineAlbum,
+                        songsCount = onlineSongs.size,
+                        collapseFraction = collapseFraction,
+                        headerHeight = currentTopBarHeightDp,
+                        onBackPressed = { navController.popBackStack() },
+                        onPlayClick = {
+                            if (onlineSongs.isNotEmpty()) {
+                                playerViewModel.playOnlineSong(onlineSongs.random(), onlineSongs, onlineAlbum.title)
+                            }
+                        }
                     )
                 }
             }
@@ -534,6 +687,200 @@ private fun CollapsingAlbumTopBar(
             ) {
                 Icon(Icons.Rounded.Shuffle, contentDescription = "Shuffle play album")
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CollapsingOnlineAlbumTopBar(
+    onlineAlbum: OnlineAlbumDetail,
+    songsCount: Int,
+    collapseFraction: Float,
+    headerHeight: Dp,
+    onBackPressed: () -> Unit,
+    onPlayClick: () -> Unit
+) {
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val statusBarColor =
+        if (LocalMusiclyDarkTheme.current) Color.Black.copy(alpha = 0.6f) else Color.White.copy(
+            alpha = 0.4f
+        )
+
+    val fabScale = 1f - collapseFraction
+    val backgroundAlpha = collapseFraction
+    val headerContentAlpha = 1f - (collapseFraction * 2).coerceAtMost(1f)
+
+    val titleScale = lerp(1f, 0.75f, collapseFraction)
+    val titlePaddingStart = lerp(24.dp, 58.dp, collapseFraction)
+    val titleMaxLines = if (collapseFraction < 0.5f) 2 else 1
+    val titleVerticalBias = lerp(1f, -1f, collapseFraction)
+    val animatedTitleAlignment =
+        BiasAlignment(horizontalBias = -1f, verticalBias = titleVerticalBias)
+    val titleContainerHeight = lerp(88.dp, 56.dp, collapseFraction)
+    val yOffsetCorrection = lerp((titleContainerHeight / 2) - 64.dp, 0.dp, collapseFraction)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(headerHeight)
+            .background(surfaceColor.copy(alpha = backgroundAlpha))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = headerContentAlpha }
+        ) {
+            SmartImage(
+                model = onlineAlbum.thumbnailUrl,
+                contentDescription = "Cover of ${onlineAlbum.title}",
+                contentScale = ContentScale.Crop,
+                targetSize = Size(1600, 1600),
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0.4f to Color.Transparent,
+                                1f to MaterialTheme.colorScheme.surface
+                            )
+                        )
+                    )
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(80.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(statusBarColor, Color.Transparent)
+                    )
+                )
+                .align(Alignment.TopCenter)
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+        ) {
+            FilledIconButton(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 12.dp, top = 4.dp),
+                onClick = onBackPressed,
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+            ) {
+                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+
+            Box(
+                modifier = Modifier
+                    .align(animatedTitleAlignment)
+                    .height(titleContainerHeight)
+                    .fillMaxWidth()
+                    .offset(y = yOffsetCorrection)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = titlePaddingStart, end = 120.dp)
+                        .graphicsLayer {
+                            scaleX = titleScale
+                            scaleY = titleScale
+                        },
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = onlineAlbum.title,
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontSize = 26.sp,
+                            textGeometricTransform = TextGeometricTransform(scaleX = 1.2f),
+                        ),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = titleMaxLines,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = buildString {
+                            append(onlineAlbum.displayArtist)
+                            onlineAlbum.year?.let { append(" • $it") }
+                            append(" • $songsCount songs")
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            LargeExtendedFloatingActionButton(
+                onClick = onPlayClick,
+                shape = RoundedStarShape(sides = 8, curve = 0.05, rotation = 0f),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .graphicsLayer {
+                        scaleX = fabScale
+                        scaleY = fabScale
+                        alpha = fabScale
+                    }
+            ) {
+                Icon(Icons.Rounded.Shuffle, contentDescription = "Shuffle play album")
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnlineAlbumSongItem(
+    metadata: AppMediaMetadata,
+    isCurrentSong: Boolean,
+    isPlaying: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SmartImage(
+            model = metadata.thumbnailUrl,
+            contentDescription = metadata.title,
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.size(48.dp)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = metadata.title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (isCurrentSong) FontWeight.Bold else FontWeight.Normal,
+                color = if (isCurrentSong) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = buildString {
+                    append(metadata.displayArtist)
+                    metadata.duration?.let { dur ->
+                        append(" • ${dur / 60}:${"%02d".format(dur % 60)}")
+                    }
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

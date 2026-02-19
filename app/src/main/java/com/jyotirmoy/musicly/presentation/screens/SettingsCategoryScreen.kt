@@ -582,6 +582,7 @@ fun SettingsCategoryScreen(
                                     description = "Choose the Default launch tab.",
                                     options = mapOf(
                                         LaunchTab.HOME to "Home",
+                                        LaunchTab.EXPLORE to "Explore",
                                         LaunchTab.SEARCH to "Search",
                                         LaunchTab.LIBRARY to "Library",
                                     ),

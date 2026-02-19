@@ -61,6 +61,39 @@ data class ChangelogVersion(
 // The changelog data
 val changelog = listOf(
     ChangelogVersion(
+        version = "0.7.0-beta",
+        date = "2026-02-19",
+        sections = listOf(
+            ChangelogSection(
+                title = "Highlights",
+                items = listOf(
+                    "Full YouTube Music Online Playlist Integration",
+                    "Online Playlist Detail Screen with M3 Expressive Design",
+                    "Background Song Pre-loading for Seamless Playback"
+                )
+            ),
+            ChangelogSection(
+                title = "Improvements",
+                items = listOf(
+                    "Metrolist-Pattern Online Song Playback Implementation",
+                    "Direct MediaItem Creation from MediaMetadata",
+                    "Improved Queue State Management for Online Content",
+                    "Proper Stream Resolution via YouTubeMediaSourceHelper"
+                )
+            ),
+            ChangelogSection(
+                title = "Fixes",
+                items = listOf(
+                    "Fixed Online Song Playback Skipping Issues",
+                    "Corrected MediaItem URI Format for Video ID Detection",
+                    "Resolved CustomCacheKey Configuration for ResolvingDataSource",
+                    "Build Stability Improvements",
+                    "Release Workflow Enhancements"
+                )
+            )
+        )
+    ),
+    ChangelogVersion(
         version = "0.6.0-beta",
         date = "2026-02-14",
         sections = listOf(
@@ -91,31 +124,6 @@ val changelog = listOf(
                     "Casting Stability Improvements",
                     "Player Sheet Stability",
                     "General Bug Fixes & Cleanup"
-                )
-            )
-        )
-    ),
-    ChangelogVersion(
-        version = "0.4.0-beta",
-        date = "2025-12-15",
-        sections = listOf(
-            ChangelogSection(
-                title = "Highlights",
-                items = listOf(
-                    "Major navigation redesign",
-                    "New file explorer for choosing source directories",
-                    "New Connectivity and casting functionalities",
-                    "Seamless continuity between remote devices",
-                    "Gapless transition between songs",
-                    "Crossfade control",
-                    "New Custom Transitions feature (only for playlists)",
-                    "Keep playing after closed the app",
-                    "UI Optimizations",
-                    "Improved stats feature",
-                    "Redesigned Queue control with more features",
-                    "Improved different filetypes support for playing and metadata editing",
-                    "Improved permission controller",
-                    "Minor bug fixes"
                 )
             )
         )

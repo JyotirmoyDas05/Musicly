@@ -27,6 +27,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume
+import com.jyotirmoy.musicly.data.preferences.AudioQuality
 
 /**
  * Manages two ExoPlayer instances (A and B) to enable seamless transitions.
@@ -39,6 +40,7 @@ import kotlin.coroutines.resume
 @Singleton
 class DualPlayerEngine @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val youTubeMediaSourceHelper: YouTubeMediaSourceHelper,
 ) {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var transitionJob: Job? = null
@@ -128,6 +130,43 @@ class DualPlayerEngine @Inject constructor(
      */
     fun getAudioSessionId(): Int = playerA.audioSessionId
 
+    // ---- YouTube stream helpers (delegated to YouTubeMediaSourceHelper) ----
+
+    /**
+     * Updates the audio quality preference used for YouTube stream resolution.
+     */
+    fun setAudioQuality(quality: AudioQuality) {
+        youTubeMediaSourceHelper.audioQuality = quality
+    }
+
+    /**
+     * Clears the cached stream URL for a specific video, forcing re-resolution on next play.
+     */
+    fun clearStreamUrlCache(mediaId: String) {
+        youTubeMediaSourceHelper.clearUrlCache(mediaId)
+    }
+
+    /**
+     * Clears all cached stream URLs.
+     */
+    fun clearAllStreamUrlCache() {
+        youTubeMediaSourceHelper.clearAllUrlCache()
+    }
+
+    /**
+     * Clears player cache data for a specific video.
+     */
+    fun clearPlayerCacheForSong(mediaId: String) {
+        youTubeMediaSourceHelper.clearPlayerCache(mediaId)
+    }
+
+    /**
+     * Bypasses cache for a specific mediaId on the next play (e.g., after quality change).
+     */
+    fun bypassCacheForMediaId(mediaId: String) {
+        youTubeMediaSourceHelper.bypassCacheMediaId = mediaId
+    }
+
     private var isReleased = false
 
     init {
@@ -197,12 +236,15 @@ class DualPlayerEngine @Inject constructor(
             .setUsage(C.USAGE_MEDIA)
             .build()
 
-        return ExoPlayer.Builder(context, renderersFactory).build().apply {
-            setAudioAttributes(audioAttributes, handleAudioFocus)
-            setHandleAudioBecomingNoisy(true)
-            // Explicitly keep both players live so they can overlap without affecting each other
-            playWhenReady = false
-        }
+        return ExoPlayer.Builder(context, renderersFactory)
+            .setMediaSourceFactory(youTubeMediaSourceHelper.createHybridMediaSourceFactory())
+            .setWakeMode(C.WAKE_MODE_NETWORK)
+            .build().apply {
+                setAudioAttributes(audioAttributes, handleAudioFocus)
+                setHandleAudioBecomingNoisy(true)
+                // Explicitly keep both players live so they can overlap without affecting each other
+                playWhenReady = false
+            }
     }
 
     /**

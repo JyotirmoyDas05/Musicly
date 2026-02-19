@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jyotirmoy.musicly.data.model.Album
 import com.jyotirmoy.musicly.data.model.Artist
+import com.jyotirmoy.musicly.data.model.MediaMetadata
 import com.jyotirmoy.musicly.data.model.Playlist
 import com.jyotirmoy.musicly.data.model.SearchFilterType
 import com.jyotirmoy.musicly.data.model.SearchHistoryItem
@@ -106,6 +107,16 @@ import kotlinx.coroutines.withContext
 import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 import timber.log.Timber
 import com.jyotirmoy.musicly.presentation.components.subcomps.EnhancedSongListItem
+import com.jyotirmoy.musicly.data.model.OnlineContentItem
+import com.jyotirmoy.musicly.presentation.components.ShimmerBox
+import com.jyotirmoy.musicly.presentation.viewmodel.OnlineSearchFilter
+import com.jyotirmoy.musicly.presentation.viewmodel.OnlineSearchViewModel
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.ui.layout.ContentScale
 
 
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -115,11 +126,13 @@ fun SearchScreen(
     paddingValues: PaddingValues,
     playerViewModel: PlayerViewModel = hiltViewModel(),
     playlistViewModel: PlaylistViewModel = hiltViewModel(),
+    onlineSearchViewModel: OnlineSearchViewModel = hiltViewModel(),
     navController: NavHostController,
     onSearchBarActiveChange: (Boolean) -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var active by remember { mutableStateOf(false) }
+    var isOnlineMode by remember { mutableStateOf(false) }
     val systemNavBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val bottomBarHeightDp = NavBarContentHeight + systemNavBarInset
     var showPlaylistBottomSheet by remember { mutableStateOf(false) }
@@ -152,6 +165,16 @@ fun SearchScreen(
         selectedSongForInfo = song
         playerViewModel.selectSongForInfo(song)
         showSongInfoBottomSheet = true
+    }
+
+    // Online search state
+    val onlineSearchState by onlineSearchViewModel.uiState.collectAsState()
+
+    // Trigger online search when in online mode
+    LaunchedEffect(searchQuery, active, isOnlineMode, onlineSearchState.filter) {
+        if (isOnlineMode && searchQuery.isNotBlank()) {
+            onlineSearchViewModel.performSearch(searchQuery)
+        }
     }
 
     val searchbarHorizontalPadding by animateDpAsState(
@@ -298,72 +321,169 @@ fun SearchScreen(
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp)
                         ) {
-                            // Filter chips
-                            FlowRow(
+                            // Local / Online toggle
+                            SingleChoiceSegmentedButtonRow(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(bottom = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                //verticalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
-                                SearchFilterChip(SearchFilterType.ALL, currentFilter, playerViewModel)
-                                SearchFilterChip(SearchFilterType.SONGS, currentFilter, playerViewModel)
-                                SearchFilterChip(SearchFilterType.ALBUMS, currentFilter, playerViewModel)
-                                SearchFilterChip(SearchFilterType.ARTISTS, currentFilter, playerViewModel)
-                                SearchFilterChip(SearchFilterType.PLAYLISTS, currentFilter, playerViewModel)
+                                SegmentedButton(
+                                    selected = !isOnlineMode,
+                                    onClick = { isOnlineMode = false },
+                                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                                    label = { Text("Local") },
+                                )
+                                SegmentedButton(
+                                    selected = isOnlineMode,
+                                    onClick = { isOnlineMode = true },
+                                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                                    label = { Text("Online") },
+                                )
                             }
 
-                            if (searchQuery.isBlank() && active && searchHistory.isNotEmpty()) {
-                                val rememberedOnHistoryClick: (String) -> Unit = remember(playerViewModel) {
-                                    { query -> searchQuery = query }
-                                }
-                                val rememberedOnHistoryDelete: (String) -> Unit = remember(playerViewModel) {
-                                    { query -> playerViewModel.deleteSearchHistoryItem(query) }
-                                }
-                                val rememberedOnClearAllHistory: () -> Unit = remember(playerViewModel) {
-                                    { playerViewModel.clearSearchHistory() }
-                                }
-
-                                SearchHistoryList(
-                                    historyItems = searchHistory,
-                                    onHistoryClick = rememberedOnHistoryClick,
-                                    onHistoryDelete = rememberedOnHistoryDelete,
-                                    onClearAllHistory = rememberedOnClearAllHistory
-                                )
-                            } else if (searchQuery.isNotBlank() && searchResults.isEmpty()) {
-                                EmptySearchResults(
-                                    searchQuery = searchQuery,
-                                    colorScheme = colorScheme
-                                )
-                            } else if (searchResults.isNotEmpty()) {
-                                val rememberedOnItemSelected = remember(searchQuery, playerViewModel) {
-                                    {
-                                        if (searchQuery.isNotBlank()) {
-                                            playerViewModel.onSearchQuerySubmitted(searchQuery)
-                                        }
-                                        active = false
-                                    }
-                                }
-                                SearchResultsList(
-                                    results = searchResults,
-                                    playerViewModel = playerViewModel,
-                                    onItemSelected = rememberedOnItemSelected,
-                                    currentPlayingSongId = stablePlayerState.currentSong?.id,
-                                    isPlaying = stablePlayerState.isPlaying,
-                                    onSongMoreOptionsClick = handleSongMoreOptionsClick,
-                                    navController = navController
-                                )
-                            } else if (searchQuery.isBlank() && active && searchHistory.isEmpty()) {
-                                Box(
+                            if (!isOnlineMode) {
+                                // ---- LOCAL SEARCH MODE ----
+                                // Filter chips
+                                FlowRow(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(16.dp),
-                                    contentAlignment = Alignment.Center
+                                        .padding(bottom = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
-                                    Text("No recent searches", style = MaterialTheme.typography.bodyLarge)
+                                    SearchFilterChip(SearchFilterType.ALL, currentFilter, playerViewModel)
+                                    SearchFilterChip(SearchFilterType.SONGS, currentFilter, playerViewModel)
+                                    SearchFilterChip(SearchFilterType.ALBUMS, currentFilter, playerViewModel)
+                                    SearchFilterChip(SearchFilterType.ARTISTS, currentFilter, playerViewModel)
+                                    SearchFilterChip(SearchFilterType.PLAYLISTS, currentFilter, playerViewModel)
                                 }
-                            }
-                        }
+
+                                if (searchQuery.isBlank() && active && searchHistory.isNotEmpty()) {
+                                    val rememberedOnHistoryClick: (String) -> Unit = remember(playerViewModel) {
+                                        { query -> searchQuery = query }
+                                    }
+                                    val rememberedOnHistoryDelete: (String) -> Unit = remember(playerViewModel) {
+                                        { query -> playerViewModel.deleteSearchHistoryItem(query) }
+                                    }
+                                    val rememberedOnClearAllHistory: () -> Unit = remember(playerViewModel) {
+                                        { playerViewModel.clearSearchHistory() }
+                                    }
+
+                                    SearchHistoryList(
+                                        historyItems = searchHistory,
+                                        onHistoryClick = rememberedOnHistoryClick,
+                                        onHistoryDelete = rememberedOnHistoryDelete,
+                                        onClearAllHistory = rememberedOnClearAllHistory
+                                    )
+                                } else if (searchQuery.isNotBlank() && searchResults.isEmpty()) {
+                                    EmptySearchResults(
+                                        searchQuery = searchQuery,
+                                        colorScheme = colorScheme
+                                    )
+                                } else if (searchResults.isNotEmpty()) {
+                                    val rememberedOnItemSelected = remember(searchQuery, playerViewModel) {
+                                        {
+                                            if (searchQuery.isNotBlank()) {
+                                                playerViewModel.onSearchQuerySubmitted(searchQuery)
+                                            }
+                                            active = false
+    }
+}
+
+                                    SearchResultsList(
+                                        results = searchResults,
+                                        playerViewModel = playerViewModel,
+                                        onItemSelected = rememberedOnItemSelected,
+                                        currentPlayingSongId = stablePlayerState.currentSong?.id,
+                                        isPlaying = stablePlayerState.isPlaying,
+                                        onSongMoreOptionsClick = handleSongMoreOptionsClick,
+                                        navController = navController
+                                    )
+                                } else if (searchQuery.isBlank() && active && searchHistory.isEmpty()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("No recent searches", style = MaterialTheme.typography.bodyLarge)
+                                    }
+                                }
+                            } else {
+                                // ---- ONLINE SEARCH MODE ----
+                                FlowRow(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    OnlineFilterChip(OnlineSearchFilter.ALL, onlineSearchState.filter, onlineSearchViewModel)
+                                    OnlineFilterChip(OnlineSearchFilter.SONGS, onlineSearchState.filter, onlineSearchViewModel)
+                                    OnlineFilterChip(OnlineSearchFilter.ALBUMS, onlineSearchState.filter, onlineSearchViewModel)
+                                    OnlineFilterChip(OnlineSearchFilter.ARTISTS, onlineSearchState.filter, onlineSearchViewModel)
+                                    OnlineFilterChip(OnlineSearchFilter.PLAYLISTS, onlineSearchState.filter, onlineSearchViewModel)
+                                }
+
+                                if (searchQuery.isBlank() && active && onlineSearchState.searchHistory.isNotEmpty()) {
+                                    val rememberedOnHistoryClick: (String) -> Unit = remember(onlineSearchViewModel) {
+                                        { query -> searchQuery = query }
+                                    }
+                                    val rememberedOnHistoryDelete: (String) -> Unit = remember(onlineSearchViewModel) {
+                                        { query -> onlineSearchViewModel.deleteSearchHistoryItem(query) }
+                                    }
+                                    val rememberedOnClearAllHistory: () -> Unit = remember(onlineSearchViewModel) {
+                                        { onlineSearchViewModel.clearSearchHistory() }
+                                    }
+
+                                    SearchHistoryList(
+                                        historyItems = onlineSearchState.searchHistory.map {
+                                            SearchHistoryItem(query = it, timestamp = System.currentTimeMillis())
+                                        },
+                                        onHistoryClick = rememberedOnHistoryClick,
+                                        onHistoryDelete = rememberedOnHistoryDelete,
+                                        onClearAllHistory = rememberedOnClearAllHistory,
+                                    )
+                                } else if (onlineSearchState.isLoading && onlineSearchState.results.isEmpty()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(32.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        androidx.compose.material3.CircularProgressIndicator(
+                                            modifier = Modifier.size(32.dp),
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
+                                } else if (searchQuery.isNotBlank() && onlineSearchState.results.isEmpty() && !onlineSearchState.isLoading) {
+                                    EmptySearchResults(
+                                        searchQuery = searchQuery,
+                                        colorScheme = colorScheme
+                                    )
+                                } else if (onlineSearchState.results.isNotEmpty()) {
+                                    OnlineSearchResultsList(
+                                        results = onlineSearchState.results,
+                                        navController = navController,
+                                        playerViewModel = playerViewModel,
+                                        onItemSelected = {
+                                            if (searchQuery.isNotBlank()) {
+                                                onlineSearchViewModel.onSearchSubmitted(searchQuery)
+                                            }
+                                            active = false
+                                        },
+                                    )
+                                } else if (searchQuery.isBlank() && active && onlineSearchState.searchHistory.isEmpty()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("Search YouTube Music", style = MaterialTheme.typography.bodyLarge)
+                                    }
+        }
+    }
+}
+
                     }
                 )
             }
@@ -405,28 +525,50 @@ fun SearchScreen(
                     }
                 } else {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        FlowRow(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            SearchFilterChip(SearchFilterType.ALL, currentFilter, playerViewModel)
-                            SearchFilterChip(SearchFilterType.SONGS, currentFilter, playerViewModel)
-                            SearchFilterChip(SearchFilterType.ALBUMS, currentFilter, playerViewModel)
-                            SearchFilterChip(SearchFilterType.ARTISTS, currentFilter, playerViewModel)
-                            SearchFilterChip(SearchFilterType.PLAYLISTS, currentFilter, playerViewModel)
+                        if (!isOnlineMode) {
+                            FlowRow(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                SearchFilterChip(SearchFilterType.ALL, currentFilter, playerViewModel)
+                                SearchFilterChip(SearchFilterType.SONGS, currentFilter, playerViewModel)
+                                SearchFilterChip(SearchFilterType.ALBUMS, currentFilter, playerViewModel)
+                                SearchFilterChip(SearchFilterType.ARTISTS, currentFilter, playerViewModel)
+                                SearchFilterChip(SearchFilterType.PLAYLISTS, currentFilter, playerViewModel)
+                            }
+                            SearchResultsList(
+                                results = searchResults,
+                                playerViewModel = playerViewModel,
+                                onItemSelected = { },
+                                currentPlayingSongId = stablePlayerState.currentSong?.id,
+                                isPlaying = stablePlayerState.isPlaying,
+                                onSongMoreOptionsClick = handleSongMoreOptionsClick,
+                                navController = navController
+                            )
+                        } else {
+                            FlowRow(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OnlineFilterChip(OnlineSearchFilter.ALL, onlineSearchState.filter, onlineSearchViewModel)
+                                OnlineFilterChip(OnlineSearchFilter.SONGS, onlineSearchState.filter, onlineSearchViewModel)
+                                OnlineFilterChip(OnlineSearchFilter.ALBUMS, onlineSearchState.filter, onlineSearchViewModel)
+                                OnlineFilterChip(OnlineSearchFilter.ARTISTS, onlineSearchState.filter, onlineSearchViewModel)
+                                OnlineFilterChip(OnlineSearchFilter.PLAYLISTS, onlineSearchState.filter, onlineSearchViewModel)
+                            }
+                            OnlineSearchResultsList(
+                                results = onlineSearchState.results,
+                                navController = navController,
+                                playerViewModel = playerViewModel,
+                                onItemSelected = { },
+                            )
                         }
-                        SearchResultsList(
-                            results = searchResults,
-                            playerViewModel = playerViewModel,
-                            onItemSelected = { },
-                            currentPlayingSongId = stablePlayerState.currentSong?.id,
-                            isPlaying = stablePlayerState.isPlaying,
-                            onSongMoreOptionsClick = handleSongMoreOptionsClick,
-                            navController = navController
-                        )
                     }
                 }
             }
@@ -1091,4 +1233,335 @@ fun SearchFilterChip(
              null
          }
     )
+}
+
+@Composable
+fun OnlineFilterChip(
+    filterType: OnlineSearchFilter,
+    currentFilter: OnlineSearchFilter,
+    viewModel: OnlineSearchViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val selected = filterType == currentFilter
+
+    FilterChip(
+        selected = selected,
+        onClick = { viewModel.updateFilter(filterType) },
+        label = { Text(filterType.name.lowercase().replaceFirstChar { it.titlecase() }) },
+        modifier = modifier,
+        shape = CircleShape,
+        border = BorderStroke(
+            width = 0.dp,
+            color = Color.Transparent
+        ),
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            selectedContainerColor = MaterialTheme.colorScheme.primary,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+            selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+        leadingIcon = if (selected) {
+            {
+                Icon(
+                    painter = painterResource(R.drawable.rounded_check_circle_24),
+                    contentDescription = "Selected",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(FilterChipDefaults.IconSize)
+                )
+            }
+        } else {
+            null
+        }
+    )
+}
+
+private val onlineItemShape = AbsoluteSmoothCornerShape(
+    cornerRadiusTL = 26.dp, smoothnessAsPercentTL = 60,
+    cornerRadiusTR = 26.dp, smoothnessAsPercentTR = 60,
+    cornerRadiusBR = 26.dp, smoothnessAsPercentBR = 60,
+    cornerRadiusBL = 26.dp, smoothnessAsPercentBL = 60,
+)
+
+@Composable
+fun OnlineSearchResultsList(
+    results: List<OnlineContentItem>,
+    navController: NavHostController,
+    playerViewModel: PlayerViewModel,
+    onItemSelected: () -> Unit,
+) {
+    val systemNavBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val imeInset = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+    val bottomPadding = maxOf(
+        imeInset,
+        systemNavBarInset + NavBarContentHeight + MiniPlayerHeight + 16.dp,
+    )
+
+    LazyColumn(
+        contentPadding = PaddingValues(bottom = bottomPadding),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(
+            count = results.size,
+            key = { index -> "${results[index].id}_$index" },
+        ) { index ->
+            val item = results[index]
+            Box(modifier = Modifier.padding(bottom = 4.dp)) {
+                when (item) {
+                    is OnlineContentItem.SongContent -> {
+                        OnlineSearchSongItem(
+                            song = item,
+                            onClick = {
+                                val metadata = item.toMediaMetadata()
+                                playerViewModel.playOnlineSong(metadata, listOf(metadata), "Search")
+                                onItemSelected()
+                            },
+                        )
+                    }
+                    is OnlineContentItem.AlbumContent -> {
+                        OnlineSearchAlbumItem(
+                            album = item,
+                            onClick = {
+                                navController.navigate(Screen.AlbumDetail.createRoute(item.browseId))
+                                onItemSelected()
+                            },
+                        )
+                    }
+                    is OnlineContentItem.ArtistContent -> {
+                        OnlineSearchArtistItem(
+                            artist = item,
+                            onClick = {
+                                navController.navigate(Screen.ArtistDetail.createRoute(item.id))
+                                onItemSelected()
+                            },
+                        )
+                    }
+                    is OnlineContentItem.PlaylistContent -> {
+                        OnlineSearchPlaylistItem(
+                            playlist = item,
+                            onClick = {
+                                navController.navigate(Screen.OnlinePlaylistDetail.createRoute(item.id))
+                                onItemSelected()
+                            },
+                        )
+                    }
+                    is OnlineContentItem.MoodContent -> { /* Not applicable in search */ }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OnlineSearchSongItem(
+    song: OnlineContentItem.SongContent,
+    onClick: () -> Unit,
+) {
+    Card(
+        onClick = onClick,
+        shape = onlineItemShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SmartImage(
+                model = song.thumbnailUrl,
+                contentDescription = song.title,
+                contentScale = ContentScale.Crop,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = song.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = song.artists.joinToString(", ") { it.name },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            FilledIconButton(
+                onClick = onClick,
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+            ) {
+                Icon(Icons.Rounded.PlayArrow, contentDescription = "Play", modifier = Modifier.size(24.dp))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OnlineSearchAlbumItem(
+    album: OnlineContentItem.AlbumContent,
+    onClick: () -> Unit,
+) {
+    Card(
+        onClick = onClick,
+        shape = onlineItemShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SmartImage(
+                model = album.thumbnailUrl,
+                contentDescription = album.title,
+                contentScale = ContentScale.Crop,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = album.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = album.artists.joinToString(", ") { it.name },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (album.year != null) {
+                    Text(
+                        text = "Album · ${album.year}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OnlineSearchArtistItem(
+    artist: OnlineContentItem.ArtistContent,
+    onClick: () -> Unit,
+) {
+    Card(
+        onClick = onClick,
+        shape = onlineItemShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SmartImage(
+                model = artist.thumbnailUrl,
+                contentDescription = artist.title,
+                contentScale = ContentScale.Crop,
+                shape = CircleShape,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = artist.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "Artist",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OnlineSearchPlaylistItem(
+    playlist: OnlineContentItem.PlaylistContent,
+    onClick: () -> Unit,
+) {
+    Card(
+        onClick = onClick,
+        shape = onlineItemShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SmartImage(
+                model = playlist.thumbnailUrl,
+                contentDescription = playlist.title,
+                contentScale = ContentScale.Crop,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = playlist.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (playlist.author != null) {
+                    Text(
+                        text = playlist.author,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
 }

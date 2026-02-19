@@ -10,8 +10,9 @@
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
+.idea/copilot.data.migration*.xml
 .DS_Store
-/build
+**/build
 /captures
 .externalNativeBuild
 .cxx
@@ -29,3 +30,4 @@ build.log
 build_refine.log
 my-release-key.jks
 keystore_base64.txt
+Agents.md 
