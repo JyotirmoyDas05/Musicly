@@ -78,10 +78,20 @@
 -keep class io.netty.channel.kqueue.KQueueServerSocketChannel { public <init>(); }
 -keep class io.netty.channel.kqueue.KQueueSocketChannel { public <init>(); }
 
-# Ktor server engine classes (CIO and internals) — prevent R8 from stripping
-# service-loaded or reflectively-accessed engine wiring.
+# Ktor — keep all (server + client) and suppress JVM-only warnings
 -keep class io.ktor.** { *; }
+-dontwarn io.ktor.**
 -keep class kotlinx.coroutines.** { *; }
+-dontwarn kotlinx.coroutines.**
+
+# Google Generative AI (Gemini) — reflectively loaded
+-keep class com.google.ai.** { *; }
+-dontwarn com.google.ai.**
+-keep class com.google.generativeai.** { *; }
+-dontwarn com.google.generativeai.**
+
+# JVM-only Sun NIO class referenced by Ktor file-watch utilities
+-dontwarn com.sun.nio.file.SensitivityWatchEventModifier
 
 # Please add these rules to your existing keep rules in order to suppress warnings.
 # This is generated automatically by the Android Gradle plugin.
