@@ -9,52 +9,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Hybrid HomeScreen blending local offline library and YouTube Music online content (feat: @Jyotirmoy)
-- New Quick Picks grid for exploring online music on the Home Screen (feat: @Jyotirmoy)
-- Automatic Update Checker with GitHub Release Integration (feat: @Jyotirmoy)
-- Direct APK Download & Installation from Updates (feat: @Jyotirmoy)
-- Device Architecture Detection for Optimal APK Selection (feat: @Jyotirmoy)
-- Update Button in Home Top Bar (when updates available) (feat: @Jyotirmoy)
-- Update Bottom Sheet with Release Information (feat: @Jyotirmoy)
-- Support for Multiple Device Architectures (feat: @Jyotirmoy)
+- Hybrid HomeScreen blending local offline library and YouTube Music online content (feat: @JyotirmoyDas05)
+- New Quick Picks grid for exploring online music on the Home Screen (feat: @JyotirmoyDas05)
+- Automatic Update Checker with GitHub Release Integration (feat: @JyotirmoyDas05)
+- Direct APK Download & Installation from Updates (feat: @JyotirmoyDas05)
+- Device Architecture Detection for Optimal APK Selection (feat: @JyotirmoyDas05)
+- Update Button in Home Top Bar (when updates available) (feat: @JyotirmoyDas05)
+- Update Bottom Sheet with Release Information (feat: @JyotirmoyDas05)
+- Support for Multiple Device Architectures (feat: @JyotirmoyDas05)
 
 ### Changed
 
-- Upgraded AlbumArtCollage to dynamically interleave local and online songs (refactor: @Jyotirmoy)
-- Improved 3-dots menu for albums and songs (feat: @Jyotirmoy)
-- Download Progress Tracking & Visual Feedback (feat: @Jyotirmoy)
-- Improved albums and Songs Image Cover Resolution (feat: @Jyotirmoy)
-- Enabled Filter chips in Search (feat: @Jyotirmoy)
-- Improved Library Sync (refactor: @Jyotirmoy)
+- Upgraded AlbumArtCollage to dynamically interleave local and online songs (refactor: @JyotirmoyDas05)
+- Improved 3-dots menu for albums and songs (feat: @JyotirmoyDas05)
+- Download Progress Tracking & Visual Feedback (feat: @JyotirmoyDas05)
+- Improved albums and Songs Image Cover Resolution (feat: @JyotirmoyDas05)
+- Enabled Filter chips in Search (feat: @JyotirmoyDas05)
+- Improved Library Sync (refactor: @JyotirmoyDas05)
 
 ### Fixed
 
-- Fixed UI jumping and scroll loss when playing songs from search results (fix: @Jyotirmoy)
-- Fixed 'Playlist not found' error when accessing online playlists from Home and Explore screens (fix: @Jyotirmoy)
-- Resolved Hilt missing binding error for DownloadRepositoryImpl (fix: @Jyotirmoy)
-- Fixed Ktor deprecation warning by updating download implementations (fix: @Jyotirmoy)
+- Fixed UI jumping and scroll loss when playing songs from search results (fix: @JyotirmoyDas05)
+- Fixed 'Playlist not found' error when accessing online playlists from Home and Explore screens (fix: @JyotirmoyDas05)
+- Resolved Hilt missing binding error for DownloadRepositoryImpl (fix: @JyotirmoyDas05)
+- Fixed Ktor deprecation warning by updating download implementations (fix: @JyotirmoyDas05)
 
 ## [0.7.0-beta] - 2026-02-19
 
 ### Added
 
-- Full YouTube Music online playlist integration (feat: @Jyotirmoy)
-- Online playlist detail screen with M3 Expressive design (feat: @Jyotirmoy)
-- Background playlist song pre-loading for seamless playback (feat: @Jyotirmoy)
+- Full YouTube Music online playlist integration (feat: @JyotirmoyDas05)
+- Online playlist detail screen with M3 Expressive design (feat: @JyotirmoyDas05)
+- Background playlist song pre-loading for seamless playback (feat: @JyotirmoyDas05)
 
 ### Changed
 
-- Implemented Metrolist-pattern online song playback for proper stream resolution (refactor: @Jyotirmoy)
-- Direct MediaItem creation from MediaMetadata for online content (refactor: @Jyotirmoy)
-- Improved queue state management for online playlists (feat: @Jyotirmoy)
+- Implemented Metrolist-pattern online song playback for proper stream resolution (refactor: @JyotirmoyDas05)
+- Direct MediaItem creation from MediaMetadata for online content (refactor: @JyotirmoyDas05)
+- Improved queue state management for online playlists (feat: @JyotirmoyDas05)
 
 ### Fixed
 
-- Fixed online song playback skipping issues by correcting MediaItem URI format (fix: @Jyotirmoy)
-- Resolved YouTubeMediaSourceHelper stream resolution by ensuring proper video ID detection (fix: @Jyotirmoy)
-- Fixed MediaItem customCacheKey configuration for proper ResolvingDataSource integration (fix: @Jyotirmoy)
-- Resolved build failure due to duplicate native libraries (fix: @Jyotirmoy)
-- Improved automated release workflow (fix: @Jyotirmoy)
+- Fixed online song playback skipping issues by correcting MediaItem URI format (fix: @JyotirmoyDas05)
+- Resolved YouTubeMediaSourceHelper stream resolution by ensuring proper video ID detection (fix: @JyotirmoyDas05)
+- Fixed MediaItem customCacheKey configuration for proper ResolvingDataSource integration (fix: @JyotirmoyDas05)
+- Resolved build failure due to duplicate native libraries (fix: @JyotirmoyDas05)
+- Improved automated release workflow (fix: @JyotirmoyDas05)
 
 ## [0.6.0-beta] - 2026-02-15
 
@@ -62,28 +62,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Implemented 10-band Equalizer and effects suite (feat: @Jyotirmoy)
-- Added M3U playlist import/export support (feat/fix: @lostf1sh, @Jyotirmoy)
+- Implemented 10-band Equalizer and effects suite (feat: @JyotirmoyDas05)
+- Added M3U playlist import/export support (feat/fix: @lostf1sh, @JyotirmoyDas05)
 - Integrated Deezer API for artist images (feat: @lostf1sh)
-- Added Gemini AI model selection, system prompt settings, and AI playlist entry point (feat: @lostf1sh, @Jyotirmoy)
-- Added sync offset support for lyrics and multi-strategy remote search (feat/fix: @lostf1sh, @Jyotirmoy)
-- Added Baseline Profiles for improved performance (feat/fix: @Jyotirmoy, @google-labs-julesbot)
+- Added Gemini AI model selection, system prompt settings, and AI playlist entry point (feat: @lostf1sh, @JyotirmoyDas05)
+- Added sync offset support for lyrics and multi-strategy remote search (feat/fix: @lostf1sh, @JyotirmoyDas05)
+- Added Baseline Profiles for improved performance (feat/fix: @JyotirmoyDas05, @google-labs-julesbot)
 - Added support for custom playlist covers
 
 ### Changed
 
-- **Material 3 Expressive UI**: Modernized Settings, Stats, Player, Bottom Sheets, and dialogs (refactor: @Jyotirmoy, @lostf1sh)
+- **Material 3 Expressive UI**: Modernized Settings, Stats, Player, Bottom Sheets, and dialogs (refactor: @JyotirmoyDas05, @lostf1sh)
 - **Library Sync**: Rebuilt initial sync flow with phase-based progress reporting and linear indicators (feat: @lostf1sh)
-- **Settings Architecture**: Introduced category sub-screens and improved navigation handling (refactor/fix: @Jyotirmoy)
-- **Queue & Player**: Decoupled queue updates from scroll animations, added animated queue scrolling (feat/fix: @lostf1sh, @Jyotirmoy)
+- **Settings Architecture**: Introduced category sub-screens and improved navigation handling (refactor/fix: @JyotirmoyDas05)
+- **Queue & Player**: Decoupled queue updates from scroll animations, added animated queue scrolling (feat/fix: @lostf1sh, @JyotirmoyDas05)
 - Improved widget previews and case-insensitive sorting logic (feat/fix: @lostf1sh, @google-labs-julesbot)
 
 ### Fixed
 
-- Fixed casting stability, queue transitions, and reduced latency (fix: @Jyotirmoy)
-- Fixed delayed content rendering and unwanted collapses in Player Sheet (fix/refactor: @Jyotirmoy)
+- Fixed casting stability, queue transitions, and reduced latency (fix: @JyotirmoyDas05)
+- Fixed delayed content rendering and unwanted collapses in Player Sheet (fix/refactor: @JyotirmoyDas05)
 - Fixed reordering issues in queue
-- General crash fixes and minor UX improvements (fix: @lostf1sh, @Jyotirmoy)
+- General crash fixes and minor UX improvements (fix: @lostf1sh, @JyotirmoyDas05)
 
 ## [0.4.0-beta] - 2025-12-15
 
