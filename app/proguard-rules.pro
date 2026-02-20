@@ -44,14 +44,14 @@
 # Rules for TagLib
 -keep class com.kyant.taglib.** { *; }
 
-# [NUEVO] Regla general para mantener metadatos de Kotlin, puede ayudar a R8
+# [NEW] General rule to keep Kotlin metadata, can help R8
 -keep class kotlin.Metadata { *; }
 
 # ExoPlayer FFmpeg extension
 -keep class androidx.media3.decoder.ffmpeg.** { *; }
 -keep class androidx.media3.exoplayer.ffmpeg.** { *; }
 
-# Mantener clases de datos y sus miembros para evitar que R8 Full elimine campos
+# Keep data classes and their members to prevent R8 Full from removing fields
 -keepclassmembers class com.jyotirmoy.musicly.data.model.** { *; }
 -keepclassmembers class com.jyotirmoy.musicly.domain.model.** { *; }
 
@@ -96,7 +96,7 @@
 # Please add these rules to your existing keep rules in order to suppress warnings.
 # This is generated automatically by the Android Gradle plugin.
 
-# [NUEVO] Reglas para solucionar el error de Ktor y R8
+# [NEW] Rules to fix Ktor and R8 error
 -dontwarn java.lang.management.**
 -dontwarn reactor.blockhound.**
 

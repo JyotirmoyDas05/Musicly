@@ -77,6 +77,7 @@ import com.jyotirmoy.musicly.ui.theme.LocalMusiclyDarkTheme
 import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.PlaylistPlay
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 // import androidx.compose.runtime.derivedStateOf // Already imported
@@ -87,7 +88,10 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
 import androidx.compose.ui.platform.LocalDensity
+
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.media3.common.util.UnstableApi
@@ -108,6 +112,8 @@ import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 import timber.log.Timber
 import com.jyotirmoy.musicly.presentation.components.subcomps.EnhancedSongListItem
 import com.jyotirmoy.musicly.data.model.OnlineContentItem
+import com.jyotirmoy.musicly.presentation.components.OnlineSongMenuContext
+import com.jyotirmoy.musicly.presentation.components.OnlineSongOptionsBottomSheet
 import com.jyotirmoy.musicly.presentation.components.ShimmerBox
 import com.jyotirmoy.musicly.presentation.viewmodel.OnlineSearchFilter
 import com.jyotirmoy.musicly.presentation.viewmodel.OnlineSearchViewModel
@@ -130,6 +136,7 @@ fun SearchScreen(
     navController: NavHostController,
     onSearchBarActiveChange: (Boolean) -> Unit = {}
 ) {
+    val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     var active by remember { mutableStateOf(false) }
     var isOnlineMode by remember { mutableStateOf(false) }
@@ -144,6 +151,8 @@ fun SearchScreen(
     val favoriteSongIds by playerViewModel.favoriteSongIds.collectAsState()
     var showSongInfoBottomSheet by remember { mutableStateOf(false) }
     var selectedSongForInfo by remember { mutableStateOf<Song?>(null) }
+    var showOnlineSongOptions by remember { mutableStateOf(false) }
+    var selectedOnlineSong by remember { mutableStateOf<MediaMetadata?>(null) }
     val keyboardController = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(Unit) {
@@ -165,6 +174,11 @@ fun SearchScreen(
         selectedSongForInfo = song
         playerViewModel.selectSongForInfo(song)
         showSongInfoBottomSheet = true
+    }
+
+    val handleOnlineSongMoreOptionsClick: (OnlineContentItem.SongContent) -> Unit = { song ->
+        selectedOnlineSong = song.toMediaMetadata()
+        showOnlineSongOptions = true
     }
 
     // Online search state
@@ -279,7 +293,7 @@ fun SearchScreen(
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Rounded.Search,
-                            contentDescription = "Buscar",
+                            contentDescription = "Search",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(24.dp)
                         )
@@ -298,7 +312,7 @@ fun SearchScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Close,
-                                    contentDescription = "Limpiar",
+                                    contentDescription = "Clear",
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -460,17 +474,18 @@ fun SearchScreen(
                                         colorScheme = colorScheme
                                     )
                                 } else if (onlineSearchState.results.isNotEmpty()) {
-                                    OnlineSearchResultsList(
-                                        results = onlineSearchState.results,
-                                        navController = navController,
-                                        playerViewModel = playerViewModel,
-                                        onItemSelected = {
-                                            if (searchQuery.isNotBlank()) {
-                                                onlineSearchViewModel.onSearchSubmitted(searchQuery)
-                                            }
-                                            active = false
-                                        },
-                                    )
+                            OnlineSearchResultsList(
+                                results = onlineSearchState.results,
+                                navController = navController,
+                                playerViewModel = playerViewModel,
+                                onItemSelected = {
+                                    if (searchQuery.isNotBlank()) {
+                                        onlineSearchViewModel.onSearchSubmitted(searchQuery)
+                                    }
+                                    active = false
+                                },
+                                onMoreOptionsClick = handleOnlineSongMoreOptionsClick
+                            )
                                 } else if (searchQuery.isBlank() && active && onlineSearchState.searchHistory.isEmpty()) {
                                     Box(
                                         modifier = Modifier
@@ -567,12 +582,77 @@ fun SearchScreen(
                                 navController = navController,
                                 playerViewModel = playerViewModel,
                                 onItemSelected = { },
+                                onMoreOptionsClick = handleOnlineSongMoreOptionsClick
                             )
                         }
                     }
                 }
             }
         }
+    }
+
+    if (showOnlineSongOptions && selectedOnlineSong != null) {
+        val song = selectedOnlineSong!!
+        OnlineSongOptionsBottomSheet(
+            metadata = song,
+            menuContext = OnlineSongMenuContext.SEARCH,
+            onDismiss = { showOnlineSongOptions = false },
+            onPlaySong = {
+                playerViewModel.playOnlineSong(song, listOf(song), "Search")
+                showOnlineSongOptions = false
+            },
+            onAddToQueue = {
+                // Convert MediaMetadata to Song for queue
+                // We need a way to add MediaMetadata directly or convert it
+                // For now, let's use a helper in PlayerViewModel or construct it
+                // Re-using startRadio logic or similar
+                // Actually, PlayerViewModel.addSongToQueue takes a Song.
+                // We need to convert MediaMetadata -> Song (as if it were a queue item)
+                // Using the same logic as when playing it
+                // For now, let's defer this or use a temporary solution.
+                // Wait, playOnlineSong handles it. We should probably expose an addOnlineSongToQueue.
+                // But for now, let's implement the sheet logic.
+                // The easiest way is to use playerViewModel.addSongToQueue(song.toPlayableSong()) if accessbile
+                // But toPlayableSong is internal/private? No, it's in PlayerViewModel.
+                // Actually, let's just use the startRadio for now or implement the others.
+                // Wait, I need to implement onAddToQueue.
+                // I'll leave a TODO or fix PlayerViewModel later.
+                // Let's check PlayerViewModel again.
+                // PlayerViewModel has `addSongToQueue(Song)`.
+                // MediaMetadata doesn't have a direct toSong() in this context without `toPlayableSong` which is likely in PlayerViewModel or similar.
+                // Actually `toPlayableSong` was seen in PlayerViewModel.
+                // Let's assume I can add a method to PlayerViewModel or use what's available.
+                // I'll call a new method `playerViewModel.addOnlineSongToQueue(song)` which I will create.
+                playerViewModel.addOnlineSongToQueue(song)
+                showOnlineSongOptions = false
+            },
+            onPlayNext = {
+                playerViewModel.addOnlineSongNextToQueue(song)
+                showOnlineSongOptions = false
+            },
+            onStartRadio = {
+                playerViewModel.startRadio(song)
+                showOnlineSongOptions = false
+            },
+            onAddToPlaylist = {
+                // TODO: Implement Add to Playlist
+                Toast.makeText(context, "Add to Playlist not implemented yet", Toast.LENGTH_SHORT).show()
+                showOnlineSongOptions = false
+            },
+            onDownload = {
+                // TODO: Implement Download
+                Toast.makeText(context, "Download not implemented yet", Toast.LENGTH_SHORT).show()
+                showOnlineSongOptions = false
+            },
+            onNavigateToArtist = { artistId ->
+                navController.navigate(Screen.ArtistDetail.createRoute(artistId))
+                showOnlineSongOptions = false
+            },
+            onNavigateToAlbum = { albumId ->
+                navController.navigate(Screen.AlbumDetail.createRoute(albumId))
+                showOnlineSongOptions = false
+            }
+        )
     }
 
     if (showSongInfoBottomSheet && selectedSongForInfo != null) {
@@ -797,6 +877,7 @@ fun SearchResultsList(
 ) {
     val localDensity = LocalDensity.current
     val playerStableState by playerViewModel.stablePlayerStateInfrequent.collectAsState()
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     if (results.isEmpty()) {
         Box(
@@ -871,7 +952,8 @@ fun SearchResultsList(
                                 val rememberedOnClick = remember(item.song, playerViewModel, onItemSelected) {
                                     {
                                         playerViewModel.showAndPlaySong(item.song)
-                                        onItemSelected()
+                                        keyboardController?.hide()
+                                        Unit
                                     }
                                 }
                                 EnhancedSongListItem(
@@ -889,7 +971,8 @@ fun SearchResultsList(
                                         Timber.tag("SearchScreen")
                                             .d("Album clicked: ${item.album.title}")
                                         playerViewModel.playAlbum(item.album)
-                                        onItemSelected()
+                                        keyboardController?.hide()
+                                        Unit
                                     }
                                 }
                                 val onOpenClick = remember (
@@ -913,7 +996,8 @@ fun SearchResultsList(
                                         Timber.tag("SearchScreen")
                                             .d("Artist clicked: ${item.artist.name}")
                                         playerViewModel.playArtist(item.artist)
-                                        onItemSelected()
+                                        keyboardController?.hide()
+                                        Unit
                                     }
                                 }
                                 val onOpenClick = remember (
@@ -949,7 +1033,8 @@ fun SearchResultsList(
                                             if (playerStableState.isShuffleEnabled) playerViewModel.toggleShuffle()
                                         } else
                                             playerViewModel.sendToast("Empty playlist")
-                                        onItemSelected()
+                                        keyboardController?.hide()
+                                        Unit
                                     }
                                 }
                                 val onOpenClick = remember (
@@ -1289,6 +1374,7 @@ fun OnlineSearchResultsList(
     navController: NavHostController,
     playerViewModel: PlayerViewModel,
     onItemSelected: () -> Unit,
+    onMoreOptionsClick: (OnlineContentItem.SongContent) -> Unit
 ) {
     val systemNavBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val imeInset = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
@@ -1296,6 +1382,7 @@ fun OnlineSearchResultsList(
         imeInset,
         systemNavBarInset + NavBarContentHeight + MiniPlayerHeight + 16.dp,
     )
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     LazyColumn(
         contentPadding = PaddingValues(bottom = bottomPadding),
@@ -1314,8 +1401,10 @@ fun OnlineSearchResultsList(
                             onClick = {
                                 val metadata = item.toMediaMetadata()
                                 playerViewModel.playOnlineSong(metadata, listOf(metadata), "Search")
-                                onItemSelected()
+                                keyboardController?.hide()
+                                Unit
                             },
+                            onMoreOptionsClick = { onMoreOptionsClick(item) }
                         )
                     }
                     is OnlineContentItem.AlbumContent -> {
@@ -1357,6 +1446,7 @@ fun OnlineSearchResultsList(
 private fun OnlineSearchSongItem(
     song: OnlineContentItem.SongContent,
     onClick: () -> Unit,
+    onMoreOptionsClick: () -> Unit
 ) {
     Card(
         onClick = onClick,
@@ -1395,6 +1485,18 @@ private fun OnlineSearchSongItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                )
+            }
+            IconButton(
+                onClick = onMoreOptionsClick,
+                modifier = Modifier
+                    .size(40.dp)
+                    .padding(end = 4.dp), // Add a little spacing
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.MoreVert,
+                    contentDescription = "More options",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             FilledIconButton(

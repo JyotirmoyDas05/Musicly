@@ -12,7 +12,7 @@ import com.jyotirmoy.musicly.utils.normalizeMetadataTextOrEmpty
     indices = [
         Index(value = ["title"], unique = false),
         Index(value = ["artist_id"], unique = false), // Para buscar álbumes por artista
-        Index(value = ["artist_name"], unique = false) // Nuevo índice para búsquedas por nombre de artista del álbum
+        Index(value = ["artist_name"], unique = false) // New index for album artist name searches
     ]
 )
 data class AlbumEntity(

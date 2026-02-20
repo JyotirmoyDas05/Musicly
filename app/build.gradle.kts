@@ -341,6 +341,13 @@ dependencies {
     // Ktor for HTTP Server
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.cio)
+    
+    // Ktor for APK Downloads
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.okhttp)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.json)
+    
     implementation(libs.kotlinx.coroutines.core)
 
     implementation(libs.androidx.ui.text.google.fonts)

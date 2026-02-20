@@ -1346,7 +1346,7 @@ fun LibraryNavigationPillSetupShow(
                 Icon(
                     modifier = Modifier.rotate(arrowRotation),
                     imageVector = Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = "Expandir menú",
+                    contentDescription = "Expand menu",
                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
@@ -1512,12 +1512,12 @@ fun SetupBottomBar(
                         label = "AnimatedFabIcon"
                     ) { isNextPage ->
                         if (isNextPage) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = "Siguiente")
+                            Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = "Next")
                         } else {
                             if (isFinishButtonEnabled) {
-                                Icon(Icons.Rounded.Check, contentDescription = "Finalizar")
+                                Icon(Icons.Rounded.Check, contentDescription = "Finish")
                             } else {
-                                Icon(Icons.Rounded.Close, contentDescription = "Finalizar")
+                                Icon(Icons.Rounded.Close, contentDescription = "Finish")
                             }
                         }
                     }

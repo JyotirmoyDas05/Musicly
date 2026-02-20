@@ -182,7 +182,7 @@ fun LibraryActionRow(
                         visible = isPlaylistTab,
                         enter = fadeIn() + expandHorizontally(
                             expandFrom = Alignment.Start,
-                            clip = false, // <— evita el “corte” durante la expansión
+                            clip = false, // <— prevents "clipping" during expansion
                             animationSpec = spring(
                                 dampingRatio = Spring.DampingRatioMediumBouncy,
                                 stiffness = Spring.StiffnessLow
@@ -190,7 +190,7 @@ fun LibraryActionRow(
                         ),
                         exit = fadeOut() + shrinkHorizontally(
                             shrinkTowards = Alignment.Start,
-                            clip = false, // <— evita el “corte” durante la expansión
+                            clip = false, // <— prevents "clipping" during expansion
                             animationSpec = spring(
                                 dampingRatio = Spring.DampingRatioNoBouncy,
                                 stiffness = Spring.StiffnessMedium
@@ -362,33 +362,33 @@ fun Breadcrumbs(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .weight(1f)
-                // 1. Forzamos que el contenido se dibuje en una capa separada.
+                // 1. Force the content to be drawn in a separate layer.
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                 .drawWithContent {
-                    // 2. Dibujamos el contenido original (el LazyRow).
+                    // 2. Draw the original content (the LazyRow).
                     drawContent()
 
-                    // 3. Dibujamos los gradientes que actúan como "máscaras de borrado".
+                    // 3. Draw gradients that act as "erasure masks".
                     val gradientWidth = 24.dp.toPx()
 
-                    // Máscara para el borde IZQUIERDO
+                    // Mask for the LEFT edge
                     if (showStartFade) {
                         drawRect(
                             brush = Brush.horizontalGradient(
-                                // Gradiente de transparente a opaco (negro)
+                                // Gradient from transparent to opaque (black)
                                 colors = listOf(Color.Transparent, Color.Black),
                                 endX = gradientWidth
                             ),
-                            // DstIn mantiene el contenido del LazyRow solo donde esta capa es opaca.
+                            // DstIn keeps the LazyRow content only where this layer is opaque.
                             blendMode = BlendMode.DstIn
                         )
                     }
 
-                    // Máscara para el borde DERECHO
+                    // Mask for the RIGHT edge
                     if (showEndFade) {
                         drawRect(
                             brush = Brush.horizontalGradient(
-                                // Gradiente de opaco (negro) a transparente
+                                // Gradient from opaque (black) to transparent
                                 colors = listOf(Color.Black, Color.Transparent),
                                 startX = this.size.width - gradientWidth
                             ),

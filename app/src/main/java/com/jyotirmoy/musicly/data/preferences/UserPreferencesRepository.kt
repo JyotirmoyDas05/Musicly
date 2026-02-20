@@ -895,7 +895,7 @@ constructor(
         val index = currentPlaylists.indexOfFirst { it.id == playlistId }
         if (index != -1) {
             val playlist = currentPlaylists[index]
-            // Evitar duplicados, añadir solo los nuevos
+            // Avoid duplicates, add only new ones
             val newSongIds = (playlist.songIds + songIdsToAdd).distinct()
             currentPlaylists[index] =
                     playlist.copy(songIds = newSongIds, lastModified = System.currentTimeMillis())

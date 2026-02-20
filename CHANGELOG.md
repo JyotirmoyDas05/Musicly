@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0-beta] - 2026-02-20
+
+### Added
+
+- Hybrid HomeScreen blending local offline library and YouTube Music online content (feat: @Jyotirmoy)
+- New Quick Picks grid for exploring online music on the Home Screen (feat: @Jyotirmoy)
+- Automatic Update Checker with GitHub Release Integration (feat: @Jyotirmoy)
+- Direct APK Download & Installation from Updates (feat: @Jyotirmoy)
+- Device Architecture Detection for Optimal APK Selection (feat: @Jyotirmoy)
+- Update Button in Home Top Bar (when updates available) (feat: @Jyotirmoy)
+- Update Bottom Sheet with Release Information (feat: @Jyotirmoy)
+- Support for Multiple Device Architectures (feat: @Jyotirmoy)
+
+### Changed
+
+- Upgraded AlbumArtCollage to dynamically interleave local and online songs (refactor: @Jyotirmoy)
+- Improved 3-dots menu for albums and songs (feat: @Jyotirmoy)
+- Download Progress Tracking & Visual Feedback (feat: @Jyotirmoy)
+- Improved albums and Songs Image Cover Resolution (feat: @Jyotirmoy)
+- Enabled Filter chips in Search (feat: @Jyotirmoy)
+- Improved Library Sync (refactor: @Jyotirmoy)
+
+### Fixed
+
+- Fixed UI jumping and scroll loss when playing songs from search results (fix: @Jyotirmoy)
+- Fixed 'Playlist not found' error when accessing online playlists from Home and Explore screens (fix: @Jyotirmoy)
+- Resolved Hilt missing binding error for DownloadRepositoryImpl (fix: @Jyotirmoy)
+- Fixed Ktor deprecation warning by updating download implementations (fix: @Jyotirmoy)
+
 ## [0.7.0-beta] - 2026-02-19
 
 ### Added

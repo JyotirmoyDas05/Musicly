@@ -15,19 +15,19 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 /**
- * Composable que dibuja una línea horizontal con ondulación senoidal.
+ * Composable that draws a horizontal line with sine wave undulation.
  *
- * @param modifier Modificador para el Composable.
- * @param color Color de la línea.
- * @param alpha Opacidad (0f..1f).
- * @param strokeWidth Grosor de la línea (Dp).
- * @param amplitude Amplitud de la onda (Dp) — la altura máxima desde el centro.
- * @param waves Número de ondas completas a lo largo del ancho (ej: 1f = una onda).
- * @param phase Desplazamiento de fase estático (radianes). Se usa solo si animate = false.
- * @param animate Si es true, activa una animación de desplazamiento infinita.
- * @param animationDurationMillis Duración en milisegundos de un ciclo completo de animación.
- * @param samples Cantidad de puntos usados para dibujar la curva (más = más suave).
- * @param cap Tipo de extremo de la línea (Round, Butt, Square).
+ * @param modifier Modifier for the Composable.
+ * @param color Line color.
+ * @param alpha Opacity (0f..1f).
+ * @param strokeWidth Line thickness (Dp).
+ * @param amplitude Wave amplitude (Dp) — maximum height from center.
+ * @param waves Number of full waves along the width (e.g., 1f = one wave).
+ * @param phase Static phase shift (radians). Used only if animate = false.
+ * @param animate If true, enables an infinite scrolling animation.
+ * @param animationDurationMillis Duration in milliseconds for a full animation cycle.
+ * @param samples Number of points used to draw the curve (more = smoother).
+ * @param cap Line end cap type (Round, Butt, Square).
  */
 @Composable
 fun SineWaveLine(
@@ -45,7 +45,7 @@ fun SineWaveLine(
 ) {
     val density = LocalDensity.current
 
-    // --- LÓGICA DE ANIMACIÓN ---
+    // --- ANIMATION LOGIC ---
     // 1. Create an infinite transition to repeat the animation.
     val infiniteTransition = rememberInfiniteTransition(label = "SineWaveAnimation")
 
@@ -82,7 +82,7 @@ fun SineWaveLine(
             moveTo(0f, centerY + (ampPx * sin(currentPhase)))
             for (i in 1 until samples) {
                 val x = i * step
-                // theta recorre 0..(2π * waves)
+                // theta goes from 0..(2π * waves)
                 val theta = (x / w) * (2f * PI.toFloat() * waves) + currentPhase
                 val y = centerY + ampPx * sin(theta)
                 lineTo(x, y)
@@ -103,7 +103,7 @@ fun SineWaveLine(
 }
 
 /**
- * Ejemplo de uso estático:
+ * Static usage example:
  *
  * SineWaveLine(
  *     modifier = Modifier

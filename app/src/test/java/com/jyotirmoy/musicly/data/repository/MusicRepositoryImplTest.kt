@@ -29,8 +29,8 @@ import com.google.common.truth.Truth.assertThat
 //
 //    private lateinit var musicRepository: MusicRepositoryImpl
 //    private val mockMusicDao: MusicDao = mockk()
-//    private val mockSearchHistoryDao: SearchHistoryDao = mockk(relaxed = true) // relaxed para evitar mockear todos los métodos de historial
-//    private val mockContext: Context = mockk(relaxed = true) // relaxed para getAllUniqueAudioDirectories si no se testea a fondo aquí
+//    private val mockSearchHistoryDao: SearchHistoryDao = mockk(relaxed = true) // relaxed to avoid mocking all history methods
+//    private val mockContext: Context = mockk(relaxed = true) // relaxed for getAllUniqueAudioDirectories if not thoroughly tested here
 //    private val mockUserPreferencesRepository: UserPreferencesRepository = mockk()
 //
 //    private val testDispatcher = StandardTestDispatcher()

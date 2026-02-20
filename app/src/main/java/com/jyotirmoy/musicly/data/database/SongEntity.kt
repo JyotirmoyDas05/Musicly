@@ -16,7 +16,7 @@ import com.jyotirmoy.musicly.utils.normalizeMetadataTextOrEmpty
         Index(value = ["title"], unique = false),
         Index(value = ["album_id"], unique = false),
         Index(value = ["artist_id"], unique = false),
-        Index(value = ["artist_name"], unique = false), // Nuevo índice para búsquedas por nombre de artista
+        Index(value = ["artist_name"], unique = false), // New index for artist name searches
         Index(value = ["genre"], unique = false),
         Index(value = ["parent_directory_path"], unique = false) // Índice para filtrado por directorio
     ],

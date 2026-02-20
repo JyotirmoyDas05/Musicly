@@ -40,7 +40,7 @@ object AudioDecoder {
             val bufferInfo = MediaCodec.BufferInfo()
             var isEndOfStream = false
 
-            while (!isEndOfStream && pcmData.size < requiredSamples) { // --- MODIFICADO: Condición de parada ---
+            while (!isEndOfStream && pcmData.size < requiredSamples) { // --- MODIFIED: Stop condition ---
                 val inputBufferIndex = decoder.dequeueInputBuffer(TIMEOUT_US)
                 if (inputBufferIndex >= 0) {
                     val inputBuffer = decoder.getInputBuffer(inputBufferIndex)!!

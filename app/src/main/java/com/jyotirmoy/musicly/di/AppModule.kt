@@ -3,9 +3,6 @@ package com.jyotirmoy.musicly.di
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.room.Room
 import coil.ImageLoader
 import coil.disk.DiskCache
@@ -25,6 +22,10 @@ import com.jyotirmoy.musicly.data.preferences.dataStore
 import com.jyotirmoy.musicly.data.media.SongMetadataEditor
 import com.jyotirmoy.musicly.data.network.deezer.DeezerApiService
 import com.jyotirmoy.musicly.data.network.lyrics.LrcLibApiService
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
 import com.jyotirmoy.musicly.data.repository.ArtistImageRepository
 import com.jyotirmoy.musicly.data.repository.LyricsRepository
 import com.jyotirmoy.musicly.data.repository.LyricsRepositoryImpl
@@ -68,7 +69,7 @@ object AppModule {
 
     @Singleton
     @Provides
-    fun provideJson(): Json { // Proveer Json
+    fun provideJson(): Json { // Provide Json
         return Json {
             isLenient = true
             ignoreUnknownKeys = true
@@ -106,13 +107,13 @@ object AppModule {
 
     @Singleton
     @Provides
-    fun provideSearchHistoryDao(database: MusiclyDatabase): SearchHistoryDao { // NUEVO MÉTODO
+    fun provideSearchHistoryDao(database: MusiclyDatabase): SearchHistoryDao { // NEW METHOD
         return database.searchHistoryDao()
     }
 
     @Singleton
     @Provides
-    fun provideMusicDao(database: MusiclyDatabase): MusicDao { // Proveer MusicDao
+    fun provideMusicDao(database: MusiclyDatabase): MusicDao { // Provide MusicDao
         return database.musicDao()
     }
 
@@ -248,7 +249,7 @@ object AppModule {
     }
 
     /**
-     * Provee una instancia singleton de OkHttpClient con un interceptor de logging.
+     * Provides a singleton OkHttpClient instance with a logging interceptor.
      * Configured with 10s timeout and retry logic (2 retries).
      */
     @Provides
@@ -308,7 +309,7 @@ object AppModule {
     }
 
     /**
-     * Provee una instancia de OkHttpClient con timeouts para búsquedas de lyrics.
+     * Provides an OkHttpClient instance with timeouts for lyrics searches.
      * Includes DNS resolver, modern TLS, connection pool, and retry logic.
      */
     @Provides
@@ -366,7 +367,7 @@ object AppModule {
     }
 
     /**
-     * Provee una instancia singleton de Retrofit para la API de LRCLIB.
+     * Provides a singleton Retrofit instance for the LRCLIB API.
      */
     @Provides
     @Singleton
@@ -379,7 +380,7 @@ object AppModule {
     }
 
     /**
-     * Provee una instancia singleton del servicio de la API de LRCLIB.
+     * Provides a singleton service instance of the LRCLIB API.
      */
     @Provides
     @Singleton
@@ -388,7 +389,7 @@ object AppModule {
     }
 
     /**
-     * Provee una instancia de Retrofit para la API de Deezer.
+     * Provides a Retrofit instance for the Deezer API.
      */
     @Provides
     @Singleton
@@ -402,7 +403,7 @@ object AppModule {
     }
 
     /**
-     * Provee el servicio de la API de Deezer.
+     * Provides the Deezer API service.
      */
     @Provides
     @Singleton
@@ -411,7 +412,7 @@ object AppModule {
     }
 
     /**
-     * Provee el repositorio de imágenes de artistas.
+     * Provides the artist image repository.
      */
     @Provides
     @Singleton
@@ -421,4 +422,24 @@ object AppModule {
     ): ArtistImageRepository {
         return ArtistImageRepository(deezerApiService, musicDao)
     }
+
+    /**
+     * Provides a singleton Ktor HttpClient instance for downloads.
+     */
+    @Provides
+    @Singleton
+    fun provideHttpClient(okHttpClient: OkHttpClient): HttpClient {
+        return HttpClient(OkHttp) {
+            engine {
+                preconfigured = okHttpClient
+            }
+            install(ContentNegotiation) {
+                json(Json {
+                    isLenient = true
+                    ignoreUnknownKeys = true
+                })
+            }
+        }
+    }
+
 }

@@ -92,6 +92,8 @@ fun HomeGradientTopBar(
     onNavigationIconClick: () -> Unit,
     onMoreOptionsClick: () -> Unit,
     onBetaClick: () -> Unit,
+    onUpdateClick: () -> Unit = {},
+    showUpdateButton: Boolean = false,
     onMenuClick: () -> Unit = {},
 ) {
     // 1) Paint status bar with surface color
@@ -113,7 +115,7 @@ fun HomeGradientTopBar(
     TopAppBar(
         modifier = Modifier
             .background(brush = gradientBrush),
-        title = { /* nada, usamos solo acciones */ },
+        title = { /* Empty, we only use actions */ },
         navigationIcon = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -169,6 +171,21 @@ fun HomeGradientTopBar(
                 //horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.padding(end = 14.dp)
             ) {
+                if (showUpdateButton) {
+                    FilledIconButton(
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ),
+                        onClick = onUpdateClick
+                    ) {
+                        Icon(
+                            modifier = Modifier.size(18.dp),
+                            painter = painterResource(R.drawable.rounded_download_24),
+                            contentDescription = "Update Available"
+                        )
+                    }
+                }
                 FilledIconButton(
                     colors = IconButtonDefaults.filledIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,

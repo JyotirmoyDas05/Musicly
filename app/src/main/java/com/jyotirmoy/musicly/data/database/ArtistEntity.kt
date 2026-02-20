@@ -9,7 +9,7 @@ import com.jyotirmoy.musicly.utils.normalizeMetadataTextOrEmpty
 
 @Entity(
     tableName = "artists",
-    indices = [Index(value = ["name"], unique = false)] // Índice en el nombre para búsquedas rápidas
+    indices = [Index(value = ["name"], unique = false)] // Index on the name for fast searches
 )
 data class ArtistEntity(
     @PrimaryKey val id: Long,

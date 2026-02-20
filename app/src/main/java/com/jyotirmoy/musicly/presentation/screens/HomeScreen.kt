@@ -1,7 +1,14 @@
 package com.jyotirmoy.musicly.presentation.screens
 
+import android.annotation.SuppressLint
+import android.app.Activity
 import android.widget.Toast
 import androidx.activity.compose.ReportDrawnWhen
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,12 +28,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DrawerValue
@@ -42,20 +54,20 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import com.jyotirmoy.musicly.presentation.components.BetaInfoBottomSheet
-import com.jyotirmoy.musicly.presentation.components.ChangelogBottomSheet
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -70,33 +82,45 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavController
 import com.jyotirmoy.musicly.R
+import com.jyotirmoy.musicly.data.model.MediaMetadata
+import com.jyotirmoy.musicly.data.model.OnlineContentItem
 import com.jyotirmoy.musicly.data.model.Song
+import com.jyotirmoy.musicly.data.model.toMediaMetadata
 import com.jyotirmoy.musicly.presentation.components.AlbumArtCollage
-import com.jyotirmoy.musicly.presentation.components.AppSidebarDrawer
+import com.jyotirmoy.musicly.presentation.components.BetaInfoBottomSheet
+import com.jyotirmoy.musicly.presentation.components.ChangelogBottomSheet
 import com.jyotirmoy.musicly.presentation.components.DailyMixSection
-import com.jyotirmoy.musicly.presentation.components.DrawerDestination
 import com.jyotirmoy.musicly.presentation.components.HomeGradientTopBar
 import com.jyotirmoy.musicly.presentation.components.HomeOptionsBottomSheet
 import com.jyotirmoy.musicly.presentation.components.MiniPlayerHeight
-import com.jyotirmoy.musicly.presentation.components.NavBarContentHeight
+import com.jyotirmoy.musicly.presentation.components.OnlineContentSection
 import com.jyotirmoy.musicly.presentation.components.RecentlyPlayedSection
 import com.jyotirmoy.musicly.presentation.components.RecentlyPlayedSectionMinSongsToShow
 import com.jyotirmoy.musicly.presentation.components.SmartImage
 import com.jyotirmoy.musicly.presentation.components.StatsOverviewCard
-import com.jyotirmoy.musicly.presentation.model.mapRecentlyPlayedSongs
+import com.jyotirmoy.musicly.presentation.components.subcomps.AutoSizingTextToFill
 import com.jyotirmoy.musicly.presentation.components.subcomps.PlayingEqIcon
+import com.jyotirmoy.musicly.presentation.model.mapRecentlyPlayedSongs
 import com.jyotirmoy.musicly.presentation.navigation.Screen
+import com.jyotirmoy.musicly.presentation.viewmodel.HomePageUiState
+import com.jyotirmoy.musicly.presentation.viewmodel.HomeViewModel
 import com.jyotirmoy.musicly.presentation.viewmodel.PlayerViewModel
+import com.jyotirmoy.musicly.presentation.viewmodel.UpdateViewModel
 import com.jyotirmoy.musicly.presentation.viewmodel.SettingsViewModel
 import com.jyotirmoy.musicly.presentation.viewmodel.StatsViewModel
-import com.jyotirmoy.musicly.ui.theme.ExpTitleTypography
+import com.jyotirmoy.musicly.presentation.components.UpdateBottomSheet
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
+import com.jyotirmoy.musicly.presentation.components.QuickPicksGridSection
 
-// Modern HomeScreen with collapsible top bar and staggered grid layout
+sealed class HybridMixItem {
+    data class Local(val song: Song) : HybridMixItem()
+    data class Online(val item: OnlineContentItem.SongContent) : HybridMixItem()
+}
+
 @androidx.annotation.OptIn(UnstableApi::class)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,23 +128,24 @@ fun HomeScreen(
     navController: NavController,
     paddingValuesParent: PaddingValues,
     playerViewModel: PlayerViewModel = hiltViewModel(),
+    homeViewModel: HomeViewModel = hiltViewModel(),
     settingsViewModel: SettingsViewModel = hiltViewModel(),
+    updateViewModel: UpdateViewModel = hiltViewModel(),
     onOpenSidebar: () -> Unit
 ) {
     val context = LocalContext.current
-    // DETECT BENCHMARK MODE
     val isBenchmarkMode = remember {
-        (context as? android.app.Activity)?.intent?.getBooleanExtra("is_benchmark", false) ?: false
+        (context as? Activity)?.intent?.getBooleanExtra("is_benchmark", false) ?: false
     }
     val statsViewModel: StatsViewModel = hiltViewModel()
-    val settingsUiState by settingsViewModel.uiState.collectAsState()
-    // 1) Observe only the song list, which changes infrequently
+    val homePageUiState by homeViewModel.uiState.collectAsState()
+
     val allSongs by playerViewModel.allSongsFlow.collectAsState(initial = emptyList())
     val dailyMixSongs by playerViewModel.dailyMixSongs.collectAsState()
     val curatedYourMixSongs by playerViewModel.yourMixSongs.collectAsState()
     val playbackHistory by playerViewModel.playbackHistory.collectAsState()
 
-    val yourMixSongs = remember(curatedYourMixSongs, dailyMixSongs, allSongs) {
+    val yourMixSongsList = remember(curatedYourMixSongs, dailyMixSongs, allSongs) {
         when {
             curatedYourMixSongs.isNotEmpty() -> curatedYourMixSongs
             dailyMixSongs.isNotEmpty() -> dailyMixSongs
@@ -138,39 +163,47 @@ fun HomeScreen(
         recentlyPlayedSongs.map { it.song }.toImmutableList()
     }
 
+    val onlineQuickPicks = remember(homePageUiState) {
+        val state = homePageUiState
+        if (state is HomePageUiState.Success) {
+            val sections = state.homePage.sections
+            sections.flatMap { it.items }.filterIsInstance<OnlineContentItem.SongContent>()
+        } else emptyList()
+    }
+
+    val hybridMixList = remember(yourMixSongsList, onlineQuickPicks) {
+        val result = mutableListOf<HybridMixItem>()
+        val maxLen = maxOf(yourMixSongsList.size, onlineQuickPicks.size)
+        for (i in 0 until maxLen) {
+            if (i < yourMixSongsList.size) result.add(HybridMixItem.Local(yourMixSongsList[i]))
+            if (i < onlineQuickPicks.size) result.add(HybridMixItem.Online(onlineQuickPicks[i]))
+        }
+        result.toImmutableList()
+    }
+
     ReportDrawnWhen {
-        yourMixSongs.isNotEmpty() || isBenchmarkMode
+        yourMixSongsList.isNotEmpty() || onlineQuickPicks.isNotEmpty() || isBenchmarkMode
     }
 
     val yourMixSong: String = "Today's Mix for you"
 
-    // 2) Observe only currentSong (or null) to determine if padding should be shown
-    val currentSong by remember(playerViewModel.stablePlayerState) {
-        playerViewModel.stablePlayerState.map { it.currentSong }
-    }.collectAsState(initial = null)
+    val stablePlayerState by playerViewModel.stablePlayerState.collectAsState()
+    val currentSong = stablePlayerState.currentSong
+    val isShuffleEnabled = stablePlayerState.isShuffleEnabled
 
-    // 3) Observe shuffle state for sync
-    val isShuffleEnabled by remember(playerViewModel.stablePlayerState) {
-        playerViewModel.stablePlayerState
-            .map { it.isShuffleEnabled }
-            .distinctUntilChanged()
-    }.collectAsState(initial = false)
-
-    // Bottom padding if a song is playing
     val bottomPadding = if (currentSong != null) MiniPlayerHeight else 0.dp
 
     var showOptionsBottomSheet by remember { mutableStateOf(false) }
     var showChangelogBottomSheet by remember { mutableStateOf(false) }
     var showBetaInfoBottomSheet by remember { mutableStateOf(false) }
+    var showUpdateBottomSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
     val betaSheetState = rememberModalBottomSheetState()
+    val updateSheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
-    LocalContext.current
 
     val weeklyStats by statsViewModel.weeklyOverview.collectAsState()
-
-    // Drawer state for sidebar
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val isUpdateAvailable by updateViewModel.isUpdateAvailable.collectAsState()
 
     Box(
         modifier = Modifier.fillMaxSize()
@@ -188,8 +221,12 @@ fun HomeScreen(
                     onBetaClick = {
                         showBetaInfoBottomSheet = true
                     },
+                    onUpdateClick = {
+                        showUpdateBottomSheet = true
+                    },
+                    showUpdateButton = isUpdateAvailable,
                     onMenuClick = {
-                        // onOpenSidebar() // Disabled
+                        // onOpenSidebar()
                     }
                 )
             }
@@ -206,15 +243,20 @@ fun HomeScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // Your Mix
+                if (homePageUiState is HomePageUiState.Success) {
+                    val homePageData = (homePageUiState as HomePageUiState.Success).homePage
+                    // chips is not available in OnlineHomePage currently, only OnlineHomeSection
+                    // For now, let's skip the chips item until model is updated or use a mock
+                }
+
                 item(key = "your_mix_header") {
                     YourMixHeader(
                         song = yourMixSong,
                         isShuffleEnabled = isShuffleEnabled,
                         onPlayShuffled = {
-                            if (yourMixSongs.isNotEmpty()) {
+                            if (yourMixSongsList.isNotEmpty()) {
                                 playerViewModel.playSongsShuffled(
-                                    songsToPlay = yourMixSongs,
+                                    songsToPlay = yourMixSongsList,
                                     queueName = "Your Mix"
                                 )
                             }
@@ -222,22 +264,77 @@ fun HomeScreen(
                     )
                 }
 
-                // Collage
-                if (yourMixSongs.isNotEmpty()) {
+                if (hybridMixList.isNotEmpty()) {
                     item(key = "album_art_collage") {
                         AlbumArtCollage(
                             modifier = Modifier.fillMaxWidth(),
-                            songs = yourMixSongs,
+                            items = hybridMixList,
+                            getImageUrl = { item ->
+                                when (item) {
+                                    is HybridMixItem.Local -> item.song.albumArtUriString
+                                    is HybridMixItem.Online -> item.item.thumbnailUrl
+                                }
+                            },
                             padding = 14.dp,
                             height = 400.dp,
-                            onSongClick = { song ->
-                                playerViewModel.showAndPlaySong(song, yourMixSongs, "Your Mix")
+                            onItemClick = { itemToPlay ->
+                                when (itemToPlay) {
+                                    is HybridMixItem.Local -> playerViewModel.showAndPlaySong(itemToPlay.song, yourMixSongsList, "Your Mix")
+                                    is HybridMixItem.Online -> {
+                                        val metadata = itemToPlay.item.toMediaMetadata()
+                                        playerViewModel.playOnlineSong(metadata, listOf(metadata), "Your Mix")
+                                    }
+                                }
                             }
                         )
                     }
                 }
 
-                // Daily Mix
+                if (onlineQuickPicks.isNotEmpty()) {
+                    item(key = "quick_picks_grid") {
+                        QuickPicksGridSection(
+                            items = onlineQuickPicks.toImmutableList(),
+                            onItemClick = { itemToPlay ->
+                                val metadata = itemToPlay.toMediaMetadata()
+                                playerViewModel.playOnlineSong(metadata, listOf(metadata), "Quick Picks")
+                            }
+                        )
+                    }
+                }
+
+                if (homePageUiState is HomePageUiState.Success) {
+                    val sections = (homePageUiState as HomePageUiState.Success).homePage.sections
+                    sections.forEachIndexed { index, section ->
+                        item(key = "online_section_$index") {
+                            OnlineContentSection(
+                                section = section,
+                                onItemClick = { item ->
+                                    when (item) {
+                                        is OnlineContentItem.SongContent -> {
+                                            val metadata = item.toMediaMetadata()
+                                            playerViewModel.playOnlineSong(
+                                                metadata = metadata,
+                                                contextMetadata = listOf(metadata),
+                                                queueName = section.title
+                                            )
+                                        }
+                                        is OnlineContentItem.AlbumContent -> {
+                                            navController.navigate(Screen.AlbumDetail.createRoute(item.browseId))
+                                        }
+                                        is OnlineContentItem.PlaylistContent -> {
+                                            navController.navigate(Screen.OnlinePlaylistDetail.createRoute(item.id))
+                                        }
+                                        is OnlineContentItem.ArtistContent -> {
+                                            navController.navigate(Screen.ArtistDetail.createRoute(item.id))
+                                        }
+                                        else -> {}
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
                 if (dailyMixSongs.isNotEmpty()) {
                     item(key = "daily_mix_section") {
                         DailyMixSection(
@@ -254,11 +351,11 @@ fun HomeScreen(
                     item(key = "recently_played_section") {
                         RecentlyPlayedSection(
                             songs = recentlyPlayedSongs,
-                            onSongClick = { song ->
+                            onSongClick = { songToPlay ->
                                 if (recentlyPlayedQueue.isNotEmpty()) {
                                     playerViewModel.playSongs(
                                         songsToPlay = recentlyPlayedQueue,
-                                        startSong = song,
+                                        startSong = songToPlay,
                                         queueName = "Recently Played"
                                     )
                                 }
@@ -295,10 +392,9 @@ fun HomeScreen(
                         )
                     )
                 )
-        ) {
-
-        }
+        ) {}
     }
+
     if (showOptionsBottomSheet) {
         ModalBottomSheet(
             onDismissRequest = { showOptionsBottomSheet = false },
@@ -329,10 +425,28 @@ fun HomeScreen(
     if (showBetaInfoBottomSheet) {
         ModalBottomSheet(
             onDismissRequest = { showBetaInfoBottomSheet = false },
-            sheetState = betaSheetState,
-            //contentWindowInsets = { WindowInsets.statusBars.only(WindowInsets.statusBars) }
+            sheetState = betaSheetState
         ) {
             BetaInfoBottomSheet()
+        }
+    }
+    if (showUpdateBottomSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showUpdateBottomSheet = false },
+            sheetState = updateSheetState
+        ) {
+            UpdateBottomSheet(
+                viewModel = updateViewModel,
+                onDismiss = {
+                    scope.launch {
+                        updateSheetState.hide()
+                    }.invokeOnCompletion {
+                        if (!updateSheetState.isVisible) {
+                            showUpdateBottomSheet = false
+                        }
+                    }
+                }
+            )
         }
     }
 }
@@ -346,7 +460,6 @@ fun YourMixHeader(
 ) {
     val buttonCorners = 68.dp
     val colors = MaterialTheme.colorScheme
-
     val titleStyle = rememberYourMixTitleStyle()
 
     Box(
@@ -360,15 +473,12 @@ fun YourMixHeader(
                 .align(Alignment.TopStart)
                 .padding(top = 48.dp, start = 12.dp)
         ) {
-            // Your Mix Title
             Text(
                 text = "Your\nMix",
                 style = titleStyle,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
             )
-
-            // Artist/Song subtitle
             Text(
                 text = song,
                 style = MaterialTheme.typography.bodyMedium,
@@ -376,7 +486,6 @@ fun YourMixHeader(
                 modifier = Modifier.padding(start = 8.dp)
             )
         }
-        // Play Button - color changes based on shuffle state
         LargeExtendedFloatingActionButton(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -404,8 +513,6 @@ fun YourMixHeader(
     }
 }
 
-
-// SongListItem (modified to accept individual parameters)
 @Composable
 fun SongListItemFavs(
     modifier: Modifier = Modifier,
@@ -437,19 +544,18 @@ fun SongListItemFavs(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
-                modifier = Modifier
-                    .weight(0.9f),
+                modifier = Modifier.weight(0.9f),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 SmartImage(
                     model = albumArtUrl,
-                    contentDescription = "Carátula de $title",
+                    contentDescription = "Album art for $title",
                     contentScale = ContentScale.Crop,
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.size(48.dp)
                 )
                 Spacer(Modifier.width(16.dp))
-                Column(modifier = Modifier) {
+                Column {
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleMedium,
@@ -470,16 +576,15 @@ fun SongListItemFavs(
                     modifier = Modifier
                         .weight(0.1f)
                         .padding(start = 8.dp)
-                        .size(width = 18.dp, height = 16.dp), // similar al tamaño del ícono
+                        .size(width = 18.dp, height = 16.dp),
                     color = colors.primary,
-                    isPlaying = isPlaying  // or connect it to your actual playback state
+                    isPlaying = isPlaying
                 )
             }
         }
     }
 }
 
-// Wrapper Composable for SongListItemFavs to isolate state observation
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun SongListItemFavsWrapper(
@@ -488,27 +593,24 @@ fun SongListItemFavsWrapper(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Collect the stablePlayerState once
     val stablePlayerState by playerViewModel.stablePlayerStateInfrequent.collectAsState()
-
-    // Derive isThisSongPlaying using remember
-    val isThisSongPlaying = remember(song.id, stablePlayerState.currentSong?.id, stablePlayerState.isPlaying) {
-        song.id == stablePlayerState.currentSong?.id
+    val currentPlayingSong = stablePlayerState.currentSong
+    val isPlaying = stablePlayerState.isPlaying
+    val isThisSongPlaying = remember(song.id, currentPlayingSong?.id) {
+        song.id == currentPlayingSong?.id
     }
 
-    // Call the presentational composable
     SongListItemFavs(
         modifier = modifier,
         cardCorners = 0.dp,
         title = song.title,
         artist = song.displayArtist,
         albumArtUrl = song.albumArtUriString,
-        isPlaying = stablePlayerState.isPlaying,
-        isCurrentSong = song.id == stablePlayerState.currentSong?.id,
+        isPlaying = isPlaying,
+        isCurrentSong = isThisSongPlaying,
         onClick = onClick
     )
 }
-
 
 @OptIn(ExperimentalTextApi::class)
 @Composable
@@ -521,7 +623,6 @@ private fun rememberYourMixTitleStyle(): TextStyle {
                     variationSettings = FontVariation.Settings(
                         FontVariation.weight(636),
                         FontVariation.width(152f),
-                        //FontVariation.grade(40),
                         FontVariation.Setting("ROND", 50f),
                         FontVariation.Setting("XTRA", 520f),
                         FontVariation.Setting("YOPQ", 90f),
@@ -532,7 +633,6 @@ private fun rememberYourMixTitleStyle(): TextStyle {
             fontWeight = FontWeight(760),
             fontSize = 64.sp,
             lineHeight = 62.sp,
-//            letterSpacing = (-0.4).sp
         )
     }
 }

@@ -486,7 +486,7 @@ fun LibraryScreen(
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.rounded_settings_24),
-                            contentDescription = "Ajustes"
+                            contentDescription = "Settings"
                         )
                     }
 //                    FilledTonalIconButton(
@@ -1408,9 +1408,9 @@ fun LibraryNavigationPill(
     // Radius for when expanded/selected (fully round)
     val expandedRadius = 60.dp
 
-    // Animación Esquina Flecha (Interna):
-    // Depende de 'isExpanded':
-    // - true: Se vuelve redonda (expandedRadius/pillRadius) separándose visualmente.
+    // Arrow Corner Animation (Internal):
+    // Depends on 'isExpanded':
+    // - true: Becomes round (expandedRadius/pillRadius) visually separating.
     // - false: Remains straight (innerRadius) appearing joined to the title.
     val animatedArrowCorner by animateDpAsState(
         targetValue = if (isExpanded) pillRadius else innerRadius,
@@ -1486,11 +1486,11 @@ fun LibraryNavigationPill(
             }
         }
 
-        // --- PARTE 2: FLECHA (Cambia de forma según estado) ---
+        // --- PART 2: ARROW (Changes shape based on state) ---
         Surface(
             shape = RoundedCornerShape(
-                topStart = animatedArrowCorner, // Anima entre 4.dp y 26.dp
-                bottomStart = animatedArrowCorner, // Anima entre 4.dp y 26.dp
+                topStart = animatedArrowCorner, // Animates between 4.dp and 26.dp
+                bottomStart = animatedArrowCorner, // Animates between 4.dp and 26.dp
                 topEnd = pillRadius,
                 bottomEnd = pillRadius
             ),
@@ -1500,8 +1500,8 @@ fun LibraryNavigationPill(
                 .fillMaxHeight()
                 .clip(
                     RoundedCornerShape(
-                        topStart = animatedArrowCorner, // Anima entre 4.dp y 26.dp
-                        bottomStart = animatedArrowCorner, // Anima entre 4.dp y 26.dp
+                        topStart = animatedArrowCorner, // Animates between 4.dp and 26.dp
+                        bottomStart = animatedArrowCorner, // Animates between 4.dp and 26.dp
                         topEnd = pillRadius,
                         bottomEnd = pillRadius
                     )
@@ -1521,7 +1521,7 @@ fun LibraryNavigationPill(
                 Icon(
                     modifier = Modifier.rotate(arrowRotation),
                     imageVector = Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = "Expandir menú",
+                    contentDescription = "Expand menu",
                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
@@ -2823,7 +2823,7 @@ fun AlbumGridItemRedesigned(
                     var isLoadingImage by remember { mutableStateOf(true) }
                     SmartImage(
                         model = album.albumArtUriString,
-                        contentDescription = "Carátula de ${album.title}",
+                        contentDescription = "Cover of ${album.title}",
                         contentScale = ContentScale.Crop,
                         // Reduced size to improve scroll performance, as suggested in the report.
                         // ContentScale.Crop will handle adjusting the image to the aspect ratio.
@@ -3048,7 +3048,7 @@ fun ArtistListItem(artist: Artist, onClick: () -> Unit, isLoading: Boolean = fal
                     } else {
                         Icon(
                             painter = painterResource(R.drawable.rounded_artist_24),
-                            contentDescription = "Artista",
+                            contentDescription = "Artist",
                             modifier = Modifier.padding(8.dp),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
@@ -3162,7 +3162,7 @@ fun AlbumListItem(
                     var isLoadingImage by remember { mutableStateOf(true) }
                     SmartImage(
                         model = album.albumArtUriString,
-                        contentDescription = "Carátula de ${album.title}",
+                        contentDescription = "Cover of ${album.title}",
                         contentScale = ContentScale.Crop,
                         targetSize = Size(256, 256),
                         modifier = Modifier.fillMaxSize(),

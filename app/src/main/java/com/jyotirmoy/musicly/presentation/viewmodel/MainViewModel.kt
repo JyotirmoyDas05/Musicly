@@ -38,8 +38,8 @@ class MainViewModel @Inject constructor(
         )
 
     /**
-     * Un Flow que emite `true` si el SyncWorker está encolado o en ejecución.
-     * Ideal para mostrar un indicador de carga.
+     * A Flow that emits `true` if the SyncWorker is queued or running.
+     * Ideal for showing a loading indicator.
      */
     val isSyncing: StateFlow<Boolean> = syncManager.isSyncing
         .stateIn(
@@ -59,8 +59,8 @@ class MainViewModel @Inject constructor(
         )
 
     /**
-     * Un Flow que emite `true` si la base de datos de Room no tiene canciones.
-     * Nos ayuda a saber si es la primera vez que se abre la app.
+     * A Flow that emits `true` if the Room database has no songs.
+     * Helps us know if the app is being opened for the first time.
      */
     val isLibraryEmpty: StateFlow<Boolean> = musicRepository
         .getAudioFiles()
@@ -72,8 +72,8 @@ class MainViewModel @Inject constructor(
         )
 
     /**
-     * Función para iniciar la sincronización de la biblioteca de música.
-     * Se debe llamar después de que los permisos hayan sido concedidos.
+     * Function to start syncing the music library.
+     * Should be called after permissions have been granted.
      */
     fun startSync() {
         LogUtils.i(this, "startSync called")

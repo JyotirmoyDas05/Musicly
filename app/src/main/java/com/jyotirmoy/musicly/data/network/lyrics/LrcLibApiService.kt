@@ -4,7 +4,7 @@ import retrofit2.http.GET
 import retrofit2.http.Query
 
 /**
- * Interfaz de Retrofit para interactuar con la API de LRCLIB.
+ * Retrofit interface to interact with the LRCLIB API.
  */
 interface LrcLibApiService {
 

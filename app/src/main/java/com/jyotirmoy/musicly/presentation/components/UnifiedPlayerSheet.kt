@@ -701,13 +701,13 @@ private fun CastConnectingDialog() {
                 CircularProgressIndicator()
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Mantén la app abierta",
+                        text = "Keep the app open",
                         style = MaterialTheme.typography.titleMedium,
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Estamos transfiriendo la reproducción. Puede tardar unos segundos en desconectarse o reconectarse.",
+                        text = "We are transferring playback. It may take a few seconds to disconnect or reconnect.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -751,7 +751,7 @@ internal fun MiniPlayerContentInternal(
         Box(contentAlignment = Alignment.Center) {
             SmartImage(
                 model = song.albumArtUriString,
-                contentDescription = "Carátula de ${song.title}",
+                contentDescription = "Album art for ${song.title}",
                 shape = CircleShape,
                 targetSize = Size(150, 150),
                 modifier = Modifier.size(44.dp)
@@ -819,7 +819,7 @@ internal fun MiniPlayerContentInternal(
         ) {
             Icon(
                 painter = painterResource(R.drawable.rounded_skip_previous_24),
-                contentDescription = "Anterior",
+                contentDescription = "Previous",
                 tint = LocalMaterialTheme.current.primary,
                 modifier = Modifier.size(22.dp)
             )
@@ -844,7 +844,7 @@ internal fun MiniPlayerContentInternal(
         ) {
             Icon(
                 painter = if (isPlaying) painterResource(R.drawable.rounded_pause_24) else painterResource(R.drawable.rounded_play_arrow_24),
-                contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                contentDescription = if (isPlaying) "Pause" else "Play",
                 tint = LocalMaterialTheme.current.onPrimary,
                 modifier = Modifier.size(22.dp)
             )
@@ -866,7 +866,7 @@ internal fun MiniPlayerContentInternal(
         ) {
             Icon(
                 painter = painterResource(R.drawable.rounded_skip_next_24),
-                contentDescription = "Siguiente",
+                contentDescription = "Next",
                 tint = LocalMaterialTheme.current.primary,
                 modifier = Modifier.size(22.dp)
             )

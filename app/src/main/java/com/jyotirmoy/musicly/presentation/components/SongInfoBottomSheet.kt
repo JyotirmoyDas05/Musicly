@@ -170,7 +170,7 @@ fun SongInfoBottomSheet(
                     modifier = Modifier
                         .padding(horizontal = 16.dp)
                 ) {
-                    // Fila para la carátula del álbum y el título (Always visible)
+                    // Row for album art and title (Always visible)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

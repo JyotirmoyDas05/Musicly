@@ -55,7 +55,7 @@ fun WavyLinearProgressIndicator(
     activeTrackColor: Color = Color(0xFF6200EE),
     trackBackgroundColor: Color = Color(0xFF6200EE).copy(alpha = 0.24f),
     thumbColor: Color = Color(0xFF6200EE),
-    hideInactiveTrackPortion: Boolean = true, // Nuevo parámetro
+    hideInactiveTrackPortion: Boolean = true, // New parameter
     trackHeight: Dp = 6.dp,
     thumbRadius: Dp = 8.dp,
     waveAmplitude: Dp = 3.dp,

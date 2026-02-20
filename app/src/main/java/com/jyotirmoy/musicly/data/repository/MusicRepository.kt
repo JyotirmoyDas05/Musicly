@@ -15,8 +15,8 @@ import kotlinx.coroutines.flow.Flow
 
 interface MusicRepository {
     /**
-     * Obtiene la lista de archivos de audio (canciones) filtrada por directorios permitidos.
-     * @return Flow que emite una lista completa de objetos Song.
+     * Gets the list of audio files (songs) filtered by allowed directories.
+     * @return Flow that emits a complete list of Song objects.
      */
     fun getAudioFiles(): Flow<List<Song>> // Existing Flow for reactive updates
 
@@ -57,92 +57,92 @@ interface MusicRepository {
     suspend fun getRandomSongs(limit: Int): List<Song>
 
     /**
-     * Obtiene la lista de álbumes filtrada.
-     * @return Flow que emite una lista completa de objetos Album.
+     * Gets the list of filtered albums.
+     * @return Flow that emits a complete list of Album objects.
      */
     fun getAlbums(): Flow<List<Album>> // Existing Flow for reactive updates
 
     /**
-     * Obtiene la lista de artistas filtrada.
-     * @return Flow que emite una lista completa de objetos Artist.
+     * Gets the filtered list of artists.
+     * @return Flow that emits a complete list of Artist objects.
      */
     fun getArtists(): Flow<List<Artist>> // Existing Flow for reactive updates
 
     /**
-     * Obtiene la lista completa de canciones una sola vez.
-     * @return Lista de objetos Song.
+     * Gets the complete list of songs once.
+     * @return List of Song objects.
      */
     suspend fun getAllSongsOnce(): List<Song>
 
     /**
-     * Obtiene la lista completa de álbumes una sola vez.
-     * @return Lista de objetos Album.
+     * Gets the complete list of albums once.
+     * @return List of Album objects.
      */
     suspend fun getAllAlbumsOnce(): List<Album>
 
     /**
-     * Obtiene la lista completa de artistas una sola vez.
-     * @return Lista de objetos Artist.
+     * Gets the complete list of artists once.
+     * @return List of Artist objects.
      */
     suspend fun getAllArtistsOnce(): List<Artist>
 
     /**
-     * Obtiene un álbum específico por su ID.
-     * @param id El ID del álbum.
-     * @return Flow que emite el objeto Album o null si no se encuentra.
+     * Gets a specific album by its ID.
+     * @param id The ID of the album.
+     * @return Flow that emits the Album object or null if not found.
      */
     fun getAlbumById(id: Long): Flow<Album?>
 
     /**
-     * Obtiene la lista de artistas filtrada.
-     * @return Flow que emite una lista completa de objetos Artist.
+     * Gets the filtered list of artists.
+     * @return Flow that emits a complete list of Artist objects.
      */
     //fun getArtists(): Flow<List<Artist>>
 
     /**
-     * Obtiene la lista de canciones para un álbum específico (NO paginada para la cola de reproducción).
-     * @param albumId El ID del álbum.
-     * @return Flow que emite una lista de objetos Song pertenecientes al álbum.
+     * Gets the list of songs for a specific album (NOT paginated for the playback queue).
+     * @param albumId The ID of the album.
+     * @return Flow that emits a list of Song objects belonging to the album.
      */
     fun getSongsForAlbum(albumId: Long): Flow<List<Song>>
 
     /**
-     * Obtiene la lista de canciones para un artista específico (NO paginada para la cola de reproducción).
-     * @param artistId El ID del artista.
-     * @return Flow que emite una lista de objetos Song pertenecientes al artista.
+     * Gets the list of songs for a specific artist (NOT paginated for the playback queue).
+     * @param artistId The artist ID.
+     * @return Flow that emits a list of Song objects belonging to the artist.
      */
     fun getSongsForArtist(artistId: Long): Flow<List<Song>>
 
     /**
-     * Obtiene una lista de canciones por sus IDs.
-     * @param songIds Lista de IDs de canciones.
-     * @return Flow que emite una lista de objetos Song correspondientes a los IDs, en el mismo orden.
+     * Gets a list of songs by their IDs.
+     * @param songIds List of song IDs.
+     * @return Flow that emits a list of Song objects corresponding to the IDs, in the same order.
      */
     fun getSongsByIds(songIds: List<String>): Flow<List<Song>>
 
     /**
-     * Obtiene una canción por su ruta de archivo.
-     * @param path Ruta del archivo.
-     * @return El objeto Song o null si no se encuentra.
+     * Gets a song by its file path.
+     * @param path The file path.
+     * @return The Song object or null if not found.
      */
     suspend fun getSongByPath(path: String): Song?
 
     /**
-     * Obtiene todos los directorios únicos que contienen archivos de audio.
-     * Esto se usa principalmente para la configuración inicial de directorios.
-     * También gestiona el guardado inicial de directorios permitidos si es la primera vez.
-     * @return Conjunto de rutas de directorios únicas.
+     * Gets all unique directories containing audio files.
+     * This is mainly used for the initial directory setup.
+     * It also manages the initial saving of allowed directories if it's the first time.
+     * @return Set of unique directory paths.
      */
     suspend fun getAllUniqueAudioDirectories(): Set<String>
 
-    fun getAllUniqueAlbumArtUris(): Flow<List<Uri>> // Nuevo para precarga de temas
+    fun getAllUniqueAlbumArtUris(): Flow<List<Uri>> // New for theme preloading
 
-    suspend fun invalidateCachesDependentOnAllowedDirectories() // Nuevo para precarga de temas
+    suspend fun invalidateCachesDependentOnAllowedDirectories() // New for theme preloading
 
     fun searchSongs(query: String): Flow<List<Song>>
     fun searchAlbums(query: String): Flow<List<Album>>
     fun searchArtists(query: String): Flow<List<Artist>>
-    suspend fun searchPlaylists(query: String): List<Playlist> // Mantener suspend, ya que no hay Flow aún
+    suspend fun searchPlaylists(query: String): List<Playlist> // Keep suspend, since there is no Flow yet
     fun searchAll(query: String, filterType: SearchFilterType): Flow<List<SearchResultItem>>
 
     // Search History
@@ -152,43 +152,43 @@ interface MusicRepository {
     suspend fun clearSearchHistory()
 
     /**
-     * Obtiene la lista de canciones para un género específico (placeholder implementation).
-     * @param genreId El ID del género (e.g., "pop", "rock").
-     * @return Flow que emite una lista de objetos Song (simulada para este género).
+     * Gets the list of songs for a specific genre (placeholder implementation).
+     * @param genreId The genre ID (e.g., "pop", "rock").
+     * @return Flow that emits a list of Song objects (simulated for this genre).
      */
     fun getMusicByGenre(genreId: String): Flow<List<Song>> // Changed to Flow
 
     /**
-     * Cambia el estado de favorito de una canción.
-     * @param songId El ID de la canción.
-     * @return El nuevo estado de favorito (true si es favorito, false si no).
+     * Toggles the favorite status of a song.
+     * @param songId The song ID.
+     * @return The new favorite status (true if it is favorite, false if not).
      */
     suspend fun toggleFavoriteStatus(songId: String): Boolean
 
     /**
-     * Setea explícitamente el estado favorito de una canción.
-     * @param songId El ID de la canción.
-     * @param isFavorite Estado objetivo.
+     * Explicitly sets the favorite status of a song.
+     * @param songId The song ID.
+     * @param isFavorite Target state.
      */
     suspend fun setFavoriteStatus(songId: String, isFavorite: Boolean)
 
     /**
-     * Obtiene IDs de canciones favoritas directamente desde Room (tabla favorites).
+     * Gets favorite song IDs directly from Room (favorites table).
      */
     suspend fun getFavoriteSongIdsOnce(): Set<String>
 
     /**
-     * Obtiene una canción específica por su ID.
-     * @param songId El ID de la canción.
-     * @return Flow que emite el objeto Song o null si no se encuentra.
+     * Gets a specific song by its ID.
+     * @param songId The song ID.
+     * @return Flow that emits the Song object or null if not found.
      */
     fun getSong(songId: String): Flow<Song?>
     fun getArtistById(artistId: Long): Flow<Artist?>
     fun getArtistsForSong(songId: Long): Flow<List<Artist>>
 
     /**
-     * Obtiene la lista de géneros, ya sea mockeados o leídos de los metadatos.
-     * @return Flow que emite una lista de objetos Genre.
+     * Gets the list of genres, either mocked or read from metadata.
+     * @return Flow that emits a list of Genre objects.
      */
     fun getGenres(): Flow<List<com.jyotirmoy.musicly.data.model.Genre>>
 

@@ -242,7 +242,7 @@ private fun EditSongContent(
         exitDirection = FloatingToolbarExitDirection.Bottom
     )
 
-    // --- Diálogo de Información ---
+    // --- Information Dialog ---
     if (showInfoDialog) {
         AlertDialog(
             onDismissRequest = { showInfoDialog = false },
@@ -348,7 +348,7 @@ private fun EditSongContent(
                 )
             }
 
-            // --- Campo de Título ---
+            // --- Title Field ---
             item {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -396,7 +396,7 @@ private fun EditSongContent(
                 }
             }
 
-            // --- Campo de Artista ---
+            // --- Artist Field ---
             item {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -420,7 +420,7 @@ private fun EditSongContent(
                 }
             }
 
-            // --- Campo de Álbum ---
+            // --- Album Field ---
             item {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -444,7 +444,7 @@ private fun EditSongContent(
                 }
             }
 
-            // --- Campo de Género ---
+            // --- Genre Field ---
             item {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -468,7 +468,7 @@ private fun EditSongContent(
                 }
             }
 
-            // --- Campo de Letra ---
+            // --- Lyrics Field ---
             item {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(4.dp)

@@ -50,8 +50,8 @@ import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 @Composable
 fun BetaInfoBottomSheet(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val issuesUrl = "https://github.com/Jyotirmoy/Musicly/issues"
-    val reportUrl = "https://github.com/Jyotirmoy/Musicly/issues/new/choose"
+    val issuesUrl = "https://github.com/JyotirmoyDas05/musicly/issues"
+    val reportUrl = "https://github.com/JyotirmoyDas05/musicly/issues/new/choose"
 
     val fabCornerRadius = 18.dp
 
@@ -69,7 +69,7 @@ fun BetaInfoBottomSheet(modifier: Modifier = Modifier) {
             item(key = "header") {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Beta 0.7.0",
+                        text = "Beta 0.8.0",
                         fontFamily = GoogleSansRounded,
                         style = ExpTitleTypography.displaySmall,
                         color = MaterialTheme.colorScheme.onSurface
@@ -139,12 +139,12 @@ fun BetaInfoBottomSheet(modifier: Modifier = Modifier) {
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(
-                                text = "Welcome to the 0.7.0 beta!",
+                                text = "Welcome to the 0.8.0 beta!",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "This update brings full YouTube Music integration with online playlists and improved stream playback.",
+                                text = "This update brings automatic update checking with direct APK downloads and installation.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -189,22 +189,27 @@ fun BetaInfoBottomSheet(modifier: Modifier = Modifier) {
                             )
                         }
                         Text(
-                            text = "Full YouTube Music online playlist integration with seamless playback.",
+                            text = "Automatic update checker that monitors GitHub releases for new versions.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Online playlist detail screen featuring M3 Expressive design and background song pre-loading.",
+                            text = "Direct APK downloads with intelligent device architecture detection (arm64-v8a, armeabi-v7a, x86_64).",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Metrolist-pattern online playback implementation for proper stream resolution.",
+                            text = "Seamless APK installation with proper permission handling for unknown app sources.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Fixed online song skipping and improved MediaItem URI handling for video ID detection.",
+                            text = "Update button in the home screen top bar that appears only when a new version is available.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Release notes display with download progress tracking and visual feedback.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -259,7 +264,7 @@ fun BetaInfoBottomSheet(modifier: Modifier = Modifier) {
                         ) {
                             Button(
                                 onClick = { launchUrl(context, issuesUrl) },
-                                // Eliminamos height fija y usamos contentPadding
+                                // Removed fixed height and using contentPadding
                                 modifier = Modifier.fillMaxWidth(),
                                 contentPadding = PaddingValues(vertical = 16.dp),
                                 shape = AbsoluteSmoothCornerShape(
@@ -287,7 +292,7 @@ fun BetaInfoBottomSheet(modifier: Modifier = Modifier) {
                             }
                             FilledTonalButton(
                                 onClick = { launchUrl(context, reportUrl) },
-                                // Eliminamos height fija y usamos contentPadding
+                                // Removed fixed height and using contentPadding
                                 modifier = Modifier.fillMaxWidth(),
                                 contentPadding = PaddingValues(vertical = 16.dp),
                                 shape = AbsoluteSmoothCornerShape(

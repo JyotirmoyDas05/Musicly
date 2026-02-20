@@ -23,7 +23,7 @@ import java.io.IOException
 //    fun createDb() {
 //        val context = ApplicationProvider.getApplicationContext<Context>()
 //        db = Room.inMemoryDatabaseBuilder(context, MusiclyDatabase::class.java)
-//            .allowMainThreadQueries() // Permite consultas en el hilo principal para tests
+//            .allowMainThreadQueries() // Allows queries on the main thread for tests
 //            .build()
 //        musicDao = db.musicDao()
 //    }

@@ -13,10 +13,10 @@ import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.font.FontVariation
 import kotlin.math.abs
 
-// FALTA: genre_variable.ttf (Variable Font)
+// MISSING: genre_variable.ttf (Variable Font)
 // TODO: place the variable font file (e.g. RobotoFlex-VariableFont_GRAD,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf)
 // in the folder: app/src/main/res/font/
-// Y renómbralo a: genre_variable.ttf
+// And rename it to: genre_variable.ttf
 
 object GenreTypography {
 

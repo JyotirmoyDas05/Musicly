@@ -43,23 +43,24 @@ data class Config(val size: Dp, val width: Dp, val height: Dp, val align: Alignm
  * Utiliza BoxWithConstraints para adaptar las dimensiones al contenedor.
  */
 @Composable
-fun AlbumArtCollage(
-    songs: ImmutableList<Song>,
+fun <T> AlbumArtCollage(
+    items: ImmutableList<T>,
+    getImageUrl: (T) -> String?,
     modifier: Modifier = Modifier,
     height: Dp = 400.dp,
     padding: Dp = 0.dp,
-    onSongClick: (Song) -> Unit,
+    onItemClick: (T) -> Unit,
 ) {
     val context = LocalContext.current
-    val songsToShow = remember(songs) {
-        (songs.take(6) + List(6 - songs.size.coerceAtMost(6)) { null }).toImmutableList()
+    val itemsToShow = remember(items) {
+        (items.take(6) + List(6 - items.size.coerceAtMost(6)) { null }).toImmutableList()
     }
 
-    val requests = remember(songsToShow) {
-        songsToShow.map { song ->
-            song?.albumArtUriString?.let {
+    val requests = remember(itemsToShow, getImageUrl) {
+        itemsToShow.map { item ->
+            item?.let { getImageUrl(it) }?.let { url ->
                 ImageRequest.Builder(context)
-                    .data(it)
+                    .data(url)
                     .dispatcher(Dispatchers.IO)
                     .crossfade(true)
                     //.placeholder(R.drawable.ic_music_placeholder)
@@ -76,7 +77,7 @@ fun AlbumArtCollage(
             .padding(padding)
     ) {
         val boxMaxHeight = maxHeight
-        val shapeConfigs by produceState<List<Config>>(initialValue = emptyList(), songsToShow, boxMaxHeight) {
+        val shapeConfigs by produceState<List<Config>>(initialValue = emptyList(), itemsToShow, boxMaxHeight) {
             value = withContext(Dispatchers.Default) {
                 val min = minOf(300.dp, height)
                 listOf(
@@ -95,7 +96,7 @@ fun AlbumArtCollage(
             Column(Modifier.fillMaxSize()) {
                 Box(Modifier.fillMaxWidth().height(boxMaxHeight * 0.6f)) {
                     topConfigs.forEachIndexed { idx, cfg ->
-                        songsToShow.getOrNull(idx)?.let { song ->
+                        itemsToShow.getOrNull(idx)?.let { item ->
                             SmartImage(
                                 model = requests[idx],
                                 contentDescription = null,
@@ -108,7 +109,7 @@ fun AlbumArtCollage(
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
-                                    ) { onSongClick(song) }
+                                    ) { onItemClick(item) }
                                     .background(shape = cfg.shape, color = MaterialTheme.colorScheme.surfaceContainerHigh)
                                     .clip(cfg.shape)
                             )
@@ -117,7 +118,7 @@ fun AlbumArtCollage(
                 }
                 Box(Modifier.fillMaxWidth().height(boxMaxHeight * 0.4f)) {
                     bottomConfigs.forEachIndexed { j, cfg ->
-                        songsToShow.getOrNull(j + 3)?.let { song ->
+                        itemsToShow.getOrNull(j + 3)?.let { item ->
                             SmartImage(
                                 model = requests[j + 3],
                                 contentDescription = null,
@@ -130,7 +131,7 @@ fun AlbumArtCollage(
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
-                                    ) { onSongClick(song) }
+                                    ) { onItemClick(item) }
                                     .clip(cfg.shape)
                             )
                         }
@@ -139,7 +140,7 @@ fun AlbumArtCollage(
             }
         }
 
-        if (songs.isEmpty()) {
+        if (items.isEmpty()) {
             Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
                 Icon(
                     painter = painterResource(R.drawable.rounded_music_note_24),

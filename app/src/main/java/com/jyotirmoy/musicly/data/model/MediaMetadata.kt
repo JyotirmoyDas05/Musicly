@@ -71,6 +71,20 @@ fun SongItem.toMediaMetadata(): MediaMetadata = MediaMetadata(
 )
 
 /**
+ * Converts an [OnlineContentItem.SongContent] to [MediaMetadata].
+ */
+fun OnlineContentItem.SongContent.toMediaMetadata(): MediaMetadata = MediaMetadata(
+    id = id,
+    title = title,
+    artists = artists,
+    album = album,
+    duration = duration,
+    thumbnailUrl = thumbnailUrl,
+    explicit = explicit,
+    isLocal = false,
+)
+
+/**
  * Converts a local [Song] to [MediaMetadata].
  */
 fun Song.toMediaMetadata(): MediaMetadata = MediaMetadata(

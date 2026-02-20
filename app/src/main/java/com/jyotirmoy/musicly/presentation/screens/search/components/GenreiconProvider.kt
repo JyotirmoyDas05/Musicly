@@ -12,10 +12,10 @@ fun getGenreImageResource(genreId: String): Int {
 
     val normalized = normalizeGenreKey(raw)
 
-    // match exacto
+    // exact match
     GENRE_ICON_BY_ALIAS[normalized]?.let { return it }
 
-    // compuesto: "rock / metal", "hip hop, rap"
+    // compound: "rock / metal", "hip hop, rap"
     for (part in splitGenreParts(normalized)) {
         GENRE_ICON_BY_ALIAS[part]?.let { return it }
     }
@@ -34,7 +34,7 @@ private fun splitGenreParts(normalized: String): List<String> {
 }
 
 private fun keywordFallback(key: String): Int? {
-    // Orden: específico -> general
+    // Order: specific -> general
     return when {
         // --- “Catch-all” / colecciones / charts ---
         "international" in key && ("hit" in key || "top" in key) -> R.drawable.pop_mic
@@ -115,7 +115,7 @@ private fun normalizeGenreKey(input: String): String {
         .replace("\\s+".toRegex(), " ")
         .trim()
 
-    // normalizaciones comunes
+    // common normalizations
     s = s
         .replace("hip-hop", "hip hop")
         .replace("hiphop", "hip hop")
@@ -152,7 +152,7 @@ private object GenreMapBuilder {
             "radio", "radio hits", "mainstream"
         )
 
-        // --------- ROCK (más variantes) ---------
+        // --------- ROCK (more variants) ---------
         putAll(R.drawable.rock,
             "rock", "new rock", "modern rock",
             "classic rock", "hard rock", "soft rock",
@@ -167,7 +167,7 @@ private object GenreMapBuilder {
             "math rock", "stoner rock"
         )
 
-        // --------- POP (incluye indie pop bien cubierto) ---------
+        // --------- POP (includes well-covered indie pop) ---------
         putAll(R.drawable.pop_mic,
             "pop", "pop rock", "dance pop", "electropop",
             "synthpop", "synth pop", "teen pop", "adult contemporary",
@@ -183,7 +183,7 @@ private object GenreMapBuilder {
             "bedroom pop", "chill pop"
         )
 
-        // --------- METAL (más subgéneros típicos) ---------
+        // --------- METAL (more typical subgenres) ---------
         putAll(R.drawable.metal_guitar,
             "metal", "heavy metal", "thrash metal", "death metal", "black metal",
             "doom metal", "sludge metal", "stoner metal",

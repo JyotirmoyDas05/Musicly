@@ -51,7 +51,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.MoreVert
+
 import androidx.compose.material3.Text
+
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.TopAppBarDefaults
@@ -119,6 +123,16 @@ import java.util.Locale
 import kotlin.math.roundToLong
 import com.jyotirmoy.musicly.presentation.components.WavySliderExpressive
 import com.jyotirmoy.musicly.presentation.components.ToggleSegmentButton
+import com.jyotirmoy.musicly.presentation.components.OnlineSongOptionsBottomSheet
+import com.jyotirmoy.musicly.presentation.components.SongInfoBottomSheet
+import com.jyotirmoy.musicly.presentation.components.UnifiedPlayerSongInfoLayer
+import com.jyotirmoy.musicly.presentation.components.OnlineSongMenuContext
+
+
+
+import com.jyotirmoy.musicly.data.model.toMediaMetadata
+import com.jyotirmoy.musicly.data.model.MediaMetadata
+import android.widget.Toast
 
 @androidx.annotation.OptIn(UnstableApi::class)
 @SuppressLint("StateFlowValueCalledInComposition")
@@ -172,6 +186,7 @@ fun FullPlayerContent(
 
     val song = currentSong ?: retainedSong ?: return // Keep the player visible while transitioning
     var showSongInfoBottomSheet by remember { mutableStateOf(false) }
+    var showOnlineSongOptions by remember { mutableStateOf(false) }
     var showLyricsSheet by remember { mutableStateOf(false) }
     var showArtistPicker by rememberSaveable { mutableStateOf(false) }
     
@@ -387,7 +402,12 @@ fun FullPlayerContent(
                             scaleX = albumArtScale
                             scaleY = albumArtScale
                         },
-                    albumArtQuality = albumArtQuality
+                    albumArtQuality = albumArtQuality,
+                    onDoubleTap = { isForward ->
+                        val current = currentPositionProvider()
+                        val delta = if (isForward) 10000L else -10000L
+                        onSeek((current + delta).coerceAtLeast(0L))
+                    }
                 )
             }
         }
@@ -528,11 +548,18 @@ fun FullPlayerContent(
                 chipColor = playerOnAccentColor.copy(alpha = 0.8f),
                 chipContentColor = playerAccentColor,
                 showQueueButton = isLandscape,
-                onClickQueue = {
-                    showSongInfoBottomSheet = true
-                    onShowQueueClicked()
+                onClickQueue = onShowQueueClicked,
+                onClickSongInfo = {
+                    // Always try to show options, differentiating by content type
+                    if (song.contentUriString.startsWith("https://music.youtube.com")) {
+                        showOnlineSongOptions = true
+                    } else {
+                        // For local songs, show info sheet
+                        showSongInfoBottomSheet = true
+                    }
                 },
                 onClickArtist = {
+
                     val resolvedArtistId = currentSongArtists.firstOrNull()?.id ?: song.artistId
                     if (currentSongArtists.size > 1) {
                         showArtistPicker = true
@@ -702,7 +729,7 @@ fun FullPlayerContent(
                             // 2. Align content (the button) to the end (right) and vertically centered
                             contentAlignment = Alignment.CenterEnd
                         ) {
-                            // 3. Tu botón circular original, sin cambios
+                            // 3. Your original circular button, no changes
                             Box(
                                 modifier = Modifier
                                     .size(42.dp)
@@ -713,7 +740,7 @@ fun FullPlayerContent(
                             ) {
                                 Icon(
                                     painter = painterResource(R.drawable.rounded_keyboard_arrow_down_24),
-                                    contentDescription = "Colapsar",
+                                    contentDescription = "Collapse",
                                     tint = playerAccentColor
                                 )
                             }
@@ -861,8 +888,12 @@ fun FullPlayerContent(
                                     )
                                     .background(playerOnAccentColor.copy(alpha = 0.7f))
                                     .clickable {
-                                        showSongInfoBottomSheet = true
-                                        onShowQueueClicked()
+                                        if (song.contentUriString.startsWith("https://music.youtube.com")) {
+                                            showOnlineSongOptions = true
+                                        } else {
+                                            showSongInfoBottomSheet = true
+                                            onShowQueueClicked()
+                                        }
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -933,6 +964,108 @@ fun FullPlayerContent(
         )
     }
 
+    if (showSongInfoBottomSheet) {
+        SongInfoBottomSheet(
+            song = song,
+            isFavorite = isFavoriteProvider(),
+            onToggleFavorite = onFavoriteToggle,
+            onDismiss = { showSongInfoBottomSheet = false },
+            onPlaySong = {
+                // Already playing this song or we just want to ensure playback context
+                playerViewModel.showAndPlaySong(song, currentPlaybackQueue, currentQueueSourceName)
+                showSongInfoBottomSheet = false
+            },
+            onAddToQueue = {
+                playerViewModel.addSongToQueue(song)
+                showSongInfoBottomSheet = false
+                Toast.makeText(context, "Added to queue", Toast.LENGTH_SHORT).show()
+            },
+            onAddNextToQueue = {
+                playerViewModel.addSongNextToQueue(song)
+                showSongInfoBottomSheet = false
+                Toast.makeText(context, "Playing next", Toast.LENGTH_SHORT).show()
+            },
+            onAddToPlayList = {
+                // Placeholder
+                Toast.makeText(context, "Add to Playlist not implemented yet", Toast.LENGTH_SHORT).show()
+                showSongInfoBottomSheet = false
+            },
+            onDeleteFromDevice = { activity, songToDelete, onResult ->
+                playerViewModel.deleteFromDevice(activity, songToDelete, onResult)
+                showSongInfoBottomSheet = false
+            },
+            onNavigateToAlbum = {
+                // Navigation to album from here not fully wired yet
+                Toast.makeText(context, "Navigate to Album not implemented yet", Toast.LENGTH_SHORT).show()
+                showSongInfoBottomSheet = false
+            },
+            onNavigateToArtist = {
+                playerViewModel.triggerArtistNavigationFromPlayer(song.artistId)
+                showSongInfoBottomSheet = false
+            },
+            onEditSong = { title, artist, album, genre, lyrics, trackNumber, coverArtUpdate ->
+                playerViewModel.editSongMetadata(
+                    song, title, artist, album, genre, lyrics, trackNumber, coverArtUpdate
+                )
+                showSongInfoBottomSheet = false
+            },
+            generateAiMetadata = { fields ->
+                playerViewModel.generateAiMetadata(song, fields)
+            },
+            removeFromListTrigger = {
+                 playerViewModel.removeSongFromQueue(song.id)
+                 showSongInfoBottomSheet = false
+            }
+        )
+    }
+
+    if (showOnlineSongOptions) {
+        val metadata = song.toMediaMetadata()
+        OnlineSongOptionsBottomSheet(
+            metadata = metadata,
+            menuContext = OnlineSongMenuContext.PLAYER,
+            onDismiss = { showOnlineSongOptions = false },
+            onPlaySong = {
+                if (metadata.id != song.id) {
+                    playerViewModel.playOnlineSong(metadata, listOf(metadata), "Player")
+                }
+                showOnlineSongOptions = false
+            },
+            onAddToQueue = {
+                playerViewModel.addOnlineSongToQueue(metadata)
+                showOnlineSongOptions = false
+                Toast.makeText(context, "Added to queue", Toast.LENGTH_SHORT).show()
+            },
+            onPlayNext = {
+                playerViewModel.addOnlineSongNextToQueue(metadata)
+                showOnlineSongOptions = false
+                Toast.makeText(context, "Playing next", Toast.LENGTH_SHORT).show()
+            },
+            onStartRadio = {
+                playerViewModel.startRadio(metadata)
+                showOnlineSongOptions = false
+            },
+            onAddToPlaylist = {
+                // TODO: Implement Add to Playlist for Online Songs
+                Toast.makeText(context, "Add to Playlist not implemented yet", Toast.LENGTH_SHORT).show()
+                showOnlineSongOptions = false
+            },
+            onDownload = {
+                // TODO: Implement Download for Online Songs
+                Toast.makeText(context, "Download not implemented yet", Toast.LENGTH_SHORT).show()
+                showOnlineSongOptions = false
+            },
+            onNavigateToArtist = {
+                // Navigation to online artist not fully supported from here yet
+                showOnlineSongOptions = false
+            },
+            onNavigateToAlbum = {
+                // Navigation to online album not fully supported from here yet
+                showOnlineSongOptions = false
+            }
+        )
+    }
+
     val artistPickerSheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     if (showArtistPicker && currentSongArtists.isNotEmpty()) {
         ModalBottomSheet(
@@ -990,10 +1123,12 @@ private fun SongMetadataDisplaySection(
     onClickLyrics: () -> Unit,
     showQueueButton: Boolean,
     onClickQueue: () -> Unit,
+    onClickSongInfo: () -> Unit,
     onClickArtist: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
+
         modifier
             .fillMaxWidth()
             .heightIn(min = 70.dp),
@@ -1067,24 +1202,48 @@ private fun SongMetadataDisplaySection(
                 }
             }
         } else {
-            // Portrait Mode: Just the Lyrics button (Queue is in TopBar)
-            FilledIconButton(
-                modifier = Modifier
-                    .size(width = 48.dp, height = 48.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = chipColor,
-                    contentColor = chipContentColor
-                ),
-                onClick = onClickLyrics,
+            // Portrait Mode: Lyrics button + More Options
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.rounded_lyrics_24),
-                    contentDescription = "Lyrics"
-                )
+                FilledIconButton(
+                    modifier = Modifier
+                        .size(width = 48.dp, height = 48.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = chipColor,
+                        contentColor = chipContentColor
+                    ),
+                    onClick = onClickLyrics,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.rounded_lyrics_24),
+                        contentDescription = "Lyrics"
+                    )
+                }
+
+                // 3-dot menu button
+                // if (song?.contentUriString?.startsWith("https://music.youtube.com") == true) {
+                    FilledIconButton(
+                        modifier = Modifier
+                            .size(width = 48.dp, height = 48.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = chipColor,
+                            contentColor = chipContentColor
+                        ),
+                        onClick = onClickSongInfo 
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.MoreVert,
+                            contentDescription = "More Options"
+                        )
+                    }
+                // }
             }
         }
     }
 }
+
 
 private fun formatAudioMetaLabel(mimeType: String?, bitrate: Int?, sampleRate: Int?): String? {
     val formatLabel = mimeTypeToFormat(mimeType)
@@ -2000,7 +2159,7 @@ private fun BottomToggleRow(
                 inactiveContentColor = inactiveContentColor,
                 onClick = onShuffleToggle,
                 iconId = R.drawable.rounded_shuffle_24,
-                contentDesc = "Aleatorio"
+                contentDesc = "Shuffle"
             )
             val repeatActive = repeatMode != Player.REPEAT_MODE_OFF
             val repeatIcon = when (repeatMode) {
@@ -2018,7 +2177,7 @@ private fun BottomToggleRow(
                 inactiveContentColor = inactiveContentColor,
                 onClick = onRepeatToggle,
                 iconId = repeatIcon,
-                contentDesc = "Repetir"
+                contentDesc = "Repeat"
             )
             ToggleSegmentButton(
                 modifier = commonModifier,
@@ -2030,7 +2189,7 @@ private fun BottomToggleRow(
                 inactiveContentColor = inactiveContentColor,
                 onClick = onFavoriteToggle,
                 iconId = R.drawable.round_favorite_24,
-                contentDesc = "Favorito"
+                contentDesc = "Favorite"
             )
         }
     }

@@ -1353,21 +1353,38 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             transitionSchedulerJob?.cancel()
 
+            var finalContextMetadata = contextMetadata
+            var finalQueueName = queueName
+
+            // Auto-radio: if playing a single song, try to fetch a radio station for it
+            if (contextMetadata.size <= 1) {
+                try {
+                    val queue = com.jyotirmoy.musicly.data.service.player.queues.YouTubeQueue.radio(metadata)
+                    val status = queue.getInitialStatus()
+                    if (status.items.isNotEmpty()) {
+                        finalContextMetadata = status.items
+                        finalQueueName = "Radio: ${metadata.title}"
+                    }
+                } catch (e: Exception) {
+                    Timber.w(e, "Failed to auto-generate radio, falling back to single song")
+                }
+            }
+
             // Convert MediaMetadata to MediaItems (Metrolist pattern)
-            val mediaItems = contextMetadata.map { it.toMediaItem() }
+            val mediaItems = finalContextMetadata.map { it.toMediaItem() }
             
             if (mediaItems.isEmpty()) {
                 _toastEvents.emit(context.getString(R.string.no_valid_songs))
                 return@launch
             }
 
-            // Find the start index
+            // Find the start index (if radio generated, it might be 0 or the song itself)
             val startIndex = mediaItems.indexOfFirst { it.mediaId == metadata.id }.coerceAtLeast(0)
 
             // Update queue state (for UI consistency)
             queueStateHolder.saveOriginalQueueState(
-                contextMetadata.map { it.toPlayableSong() },
-                queueName
+                finalContextMetadata.map { it.toPlayableSong() },
+                finalQueueName
             )
 
             // Check if shuffle is currently active
@@ -1404,7 +1421,9 @@ class PlayerViewModel @Inject constructor(
             // Prepare and play using direct engine access
             val enginePlayer = dualPlayerEngine.masterPlayer
             if (finalMediaItems.isNotEmpty()) {
-                val finalStartIndex = finalMediaItems.indexOfFirst { it.mediaId == metadata.id }.coerceAtLeast(0)
+                // If we shuffled or generated radio, ensure we start at the correct index (likely 0 if shuffled or radio start)
+                val finalStartIndex = if (isPersistent && isShuffleOn) 0 else startIndex
+                
                 enginePlayer.setMediaItems(finalMediaItems, finalStartIndex, 0L)
                 enginePlayer.prepare()
                 enginePlayer.play()
@@ -1444,6 +1463,43 @@ class PlayerViewModel @Inject constructor(
             bitrate = null,
             sampleRate = null
         )
+    }
+
+    fun addOnlineSongToQueue(metadata: AppMediaMetadata) {
+        val song = metadata.toPlayableSong()
+        addSongToQueue(song)
+    }
+
+    fun addOnlineSongNextToQueue(metadata: AppMediaMetadata) {
+        val song = metadata.toPlayableSong()
+        addSongNextToQueue(song)
+    }
+
+    fun startRadio(metadata: AppMediaMetadata) {
+        viewModelScope.launch {
+            try {
+                // Ensure unique queue name
+                val queueName = "Radio: ${metadata.title}"
+                
+                // Get radio queue from YouTube
+                val queue = com.jyotirmoy.musicly.data.service.player.queues.YouTubeQueue.radio(metadata)
+                val status = queue.getInitialStatus()
+                val radioSongs = status.items
+                
+                // Convert to playable songs
+                val songs = radioSongs.map { it.toPlayableSong() }
+                
+                if (songs.isNotEmpty()) {
+                    playSongs(songs, songs.first(), queueName)
+                    _isSheetVisible.value = true
+                } else {
+                    _toastEvents.emit("Could not start radio station")
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Error starting radio")
+                _toastEvents.emit("Error starting radio station")
+            }
+        }
     }
 
     private fun List<Song>.matchesSongOrder(contextSongs: List<Song>): Boolean {

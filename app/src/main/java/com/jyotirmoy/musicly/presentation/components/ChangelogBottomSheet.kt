@@ -61,6 +61,50 @@ data class ChangelogVersion(
 // The changelog data
 val changelog = listOf(
     ChangelogVersion(
+        version = "0.8.0-beta",
+        date = "2026-02-20",
+        sections = listOf(
+            ChangelogSection(
+                title = "Highlights",
+                items = listOf(
+                    "Hybrid HomeScreen blending local offline library and YouTube Music online content",
+                    "New Quick Picks grid for exploring online music on the Home Screen",
+                    "Automatic Update Checker with GitHub Release Integration",
+                    "Direct APK Download & Installation from Updates",
+                    "Device Architecture Detection for Optimal APK Selection"
+                )
+            ),
+            ChangelogSection(
+                title = "Improvements",
+                items = listOf(
+                    "Upgraded AlbumArtCollage to dynamically interleave local and online songs",
+                    "Give Appropraite 3 dots menu for albums and songs",
+                    "Download Progress Tracking & Visual Feedback",
+                    "Improve albums and Songs Image Cover Resolution",
+                    "Make Filter chips work in Search",
+                    "Improve Library Sync"
+                )
+            ),
+            ChangelogSection(
+                title = "Features",
+                items = listOf(
+                    "Update Button in Home Top Bar (when updates available)",
+                    "Update Bottom Sheet with Release Information",
+                    "Support for Multiple Device Architectures"
+                )
+            ),
+            ChangelogSection(
+                title = "Fixes",
+                items = listOf(
+                    "Fixed UI jumping and scroll loss when playing songs from search results",
+                    "Fixed 'Playlist not found' error when accessing online playlists from Home and Explore screens",
+                    "Resolved Hilt missing binding error for DownloadRepositoryImpl",
+                    "Fixed Ktor deprecation warning by updating download implementations"
+                )
+            )
+        )
+    ),
+    ChangelogVersion(
         version = "0.7.0-beta",
         date = "2026-02-19",
         sections = listOf(
@@ -211,7 +255,7 @@ fun ChangelogBottomSheet(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val changelogUrl = "https://github.com/Jyotirmoy/Musicly/blob/master/CHANGELOG.md"
+    val changelogUrl = "https://github.com/JyotirmoyDas05/musicly/blob/master/CHANGELOG.md"
 
     val fabCornerRadius = 16.dp
 

@@ -1,5 +1,7 @@
 package com.jyotirmoy.musicly.presentation.components
 
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.*
@@ -41,7 +43,8 @@ fun AlbumCarouselSection(
     modifier: Modifier = Modifier,
     carouselStyle: String = CarouselStyle.NO_PEEK,
     itemSpacing: Dp = 8.dp,
-    albumArtQuality: AlbumArtQuality = AlbumArtQuality.MEDIUM
+    albumArtQuality: AlbumArtQuality = AlbumArtQuality.MEDIUM,
+    onDoubleTap: (Boolean) -> Unit = {}
 ) {
     if (queue.isEmpty()) return
 
@@ -126,6 +129,14 @@ fun AlbumCarouselSection(
                     Modifier
                         .fillMaxSize()
                         .aspectRatio(1f)
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onDoubleTap = { offset ->
+                                    val isForward = offset.x > size.width / 2
+                                    onDoubleTap(isForward)
+                                }
+                            )
+                        }
                 ) { // Enforce 1:1 aspect ratio for the item itself
                     OptimizedAlbumArt(
                         uri = song.albumArtUriString,

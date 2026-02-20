@@ -172,7 +172,7 @@ fun SongPickerContent(
                     modifier = Modifier.padding(bottom = 18.dp, end = 8.dp),
                     shape = CircleShape,
                     onClick = { onConfirm(selectedSongIds.filterValues { it }.keys) },
-                    icon = { Icon(Icons.Rounded.Check, "Añadir canciones") },
+                    icon = { Icon(Icons.Rounded.Check, "Add songs") },
                     text = { Text("Add") },
                 )
             }

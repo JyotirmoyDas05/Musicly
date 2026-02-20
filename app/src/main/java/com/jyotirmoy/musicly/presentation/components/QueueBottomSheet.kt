@@ -869,7 +869,7 @@ fun QueueBottomSheet(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = fabSpacing + navigationBarHeight)
-                        // Usamos IntrinsicSize.Min o una altura fija para asegurar igualdad
+                        // Use IntrinsicSize.Min or a fixed height to ensure equality
                         .height(70.dp)
                         .then(directSheetDragModifier),
                     horizontalArrangement = Arrangement.Center,
@@ -1699,7 +1699,7 @@ private fun QueueMiniPlayer(
             SmartImage(
                 model = song.albumArtUriString ?: R.drawable.rounded_album_24,
                 shape = albumShape,
-                contentDescription = "Carátula",
+                contentDescription = "Cover Art",
                 modifier = Modifier
                     .size(56.dp)
                     .clip(albumShape),
@@ -1740,7 +1740,7 @@ private fun QueueMiniPlayer(
             ) {
                 Icon(
                     painter = if (isPlaying) painterResource(R.drawable.rounded_pause_24) else painterResource(R.drawable.rounded_play_arrow_24),
-                    contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                    contentDescription = if (isPlaying) "Pause" else "Play",
                 )
             }
 
@@ -1757,7 +1757,7 @@ private fun QueueMiniPlayer(
             ) {
                 Icon(
                     painter = painterResource(R.drawable.rounded_skip_next_24),
-                    contentDescription = "Siguiente",
+                    contentDescription = "Next",
                 )
             }
         }
@@ -1998,7 +1998,7 @@ fun QueuePlaylistSongItem(
                 SmartImage(
                     model = song.albumArtUriString,
                     shape = albumShape,
-                    contentDescription = "Carátula",
+                    contentDescription = "Cover Art",
                     modifier = Modifier
                         .size(42.dp)
                         .clip(albumShape),

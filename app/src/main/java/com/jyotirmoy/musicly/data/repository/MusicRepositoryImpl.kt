@@ -261,7 +261,7 @@ class MusicRepositoryImpl @Inject constructor(
         }.flowOn(Dispatchers.IO)
     }
 
-    // --- Métodos de Búsqueda ---
+    // --- Search Methods ---
 
     override fun searchSongs(query: String): Flow<List<Song>> {
         if (query.isBlank()) return flowOf(emptyList())
@@ -391,11 +391,11 @@ class MusicRepositoryImpl @Inject constructor(
     }
 
     suspend fun syncMusicFromContentResolver() {
-        // Esta función ahora está en SyncWorker. Se deja el esqueleto por si se llama desde otro lugar.
+        // This function is now in SyncWorker. The skeleton is left in case it is called from elsewhere.
         Log.w("MusicRepo", "syncMusicFromContentResolver was called directly on repository. This should be handled by SyncWorker.")
     }
 
-    // Implementación de las nuevas funciones suspend para carga única
+    // Implementation of the new suspend functions for one-time loading
     override suspend fun getAllSongsOnce(): List<Song> = withContext(Dispatchers.IO) {
         musicDao.getAllSongsList().map { it.toSong() }
     }
@@ -492,11 +492,11 @@ class MusicRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Obtiene la letra de una canción desde la API de LRCLIB, la persiste en la base de datos
-     * y la devuelve como un objeto Lyrics parseado.
+     * Gets the lyrics of a song from the LRCLIB API, persists it in the database
+     * and returns it as a parsed Lyrics object.
      *
-     * @param song La canción para la cual se buscará la letra.
-     * @return Un objeto Result que contiene el objeto Lyrics si se encontró, o un error.
+     * @param song The song to search for lyrics.
+     * @return A Result object containing the Lyrics object if found, or an error.
      */
     override suspend fun getLyricsFromRemote(song: Song): Result<Pair<Lyrics, String>> {
         return lyricsRepository.fetchFromRemote(song)

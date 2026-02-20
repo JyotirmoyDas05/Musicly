@@ -380,9 +380,9 @@ class MainActivity : ComponentActivity() {
         Trace.beginSection("MainActivity.MainAppContent")
         val navController = rememberNavController()
         val isSyncing by mainViewModel.isSyncing.collectAsState()
-        val isLibraryEmpty by mainViewModel.isLibraryEmpty.collectAsState()
-        val hasCompletedInitialSync by mainViewModel.hasCompletedInitialSync.collectAsState()
-        val syncProgress by mainViewModel.syncProgress.collectAsState()
+         val isLibraryEmpty by mainViewModel.isLibraryEmpty.collectAsState()
+         val hasCompletedInitialSync by mainViewModel.hasCompletedInitialSync.collectAsState()
+         val syncProgress by mainViewModel.syncProgress.collectAsState()
         
         // Observe pending shuffle action
         val pendingShuffleAll by _pendingShuffleAll.collectAsState()
@@ -428,7 +428,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Estado para controlar si el indicador de carga puede mostrarse después de un delay
+        // State to control if the loading indicator can be shown after a delay
         var canShowLoadingIndicator by remember { mutableStateOf(false) }
         // Track when the loading indicator was first shown for minimum display time
         var loadingShownTimestamp by remember { mutableStateOf(0L) }
@@ -438,11 +438,11 @@ class MainActivity : ComponentActivity() {
 
         LaunchedEffect(shouldPotentiallyShowLoading) {
             if (shouldPotentiallyShowLoading) {
-                // Espera un breve período antes de permitir que se muestre el indicador de carga
-                // Ajusta este valor según sea necesario (por ejemplo, 300-500 ms)
+                // Wait a short period before allowing the loading indicator to show
+                // Adjust this value as needed (e.g., 300-500 ms)
                 delay(300L)
-                // Vuelve a verificar la condición después del delay,
-                // ya que el estado podría haber cambiado.
+                // Re-verify the condition after the delay,
+                // as the state might have changed.
                 if (mainViewModel.isSyncing.value && mainViewModel.isLibraryEmpty.value) {
                     canShowLoadingIndicator = true
                     loadingShownTimestamp = System.currentTimeMillis()
@@ -464,7 +464,7 @@ class MainActivity : ComponentActivity() {
         Box(modifier = Modifier.fillMaxSize()) {
             MainUI(playerViewModel, navController)
 
-            // Muestra el LoadingOverlay solo si las condiciones se cumplen Y el delay ha pasado
+            // Show the LoadingOverlay only if conditions are met AND the delay has passed
             if (canShowLoadingIndicator) {
                 LoadingOverlay(syncProgress)
             }

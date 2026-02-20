@@ -179,7 +179,7 @@ fun PlaylistDetailScreen(
     }
 
     val selectedSongForInfo by playerViewModel.selectedSongForInfo.collectAsState()
-    val favoriteIds by playerViewModel.favoriteSongIds.collectAsState() // Reintroducir favoriteIds aquí
+    val favoriteIds by playerViewModel.favoriteSongIds.collectAsState() // Reintroduce favoriteIds here
     val stableOnMoreOptionsClick: (Song) -> Unit = remember {
         { song ->
             playerViewModel.selectSongForInfo(song)
@@ -265,7 +265,7 @@ fun PlaylistDetailScreen(
                         ),
                         onClick = onBackClick
                     ) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Volver")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back")
                     }
                 },
                 actions = {

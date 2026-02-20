@@ -147,7 +147,7 @@ fun AnimatedPlaybackControls(
             ) {
                 Icon(
                     painter = painterResource(R.drawable.rounded_skip_previous_24),
-                    contentDescription = "Anterior",
+                    contentDescription = "Previous",
                     tint = tintPreviousIcon,
                     modifier = Modifier.size(iconSize)
                 )
@@ -215,7 +215,7 @@ fun AnimatedPlaybackControls(
             ) {
                 Icon(
                     painter = painterResource(R.drawable.rounded_skip_next_24),
-                    contentDescription = "Siguiente",
+                    contentDescription = "Next",
                     tint = tintNextIcon,
                     modifier = Modifier.size(iconSize)
                 )
@@ -239,7 +239,7 @@ private fun MorphingPlayPauseIcon(
             painter = painterResource(
                 if (playing) R.drawable.rounded_pause_24 else R.drawable.rounded_play_arrow_24
             ),
-            contentDescription = if (playing) "Pausar" else "Reproducir",
+            contentDescription = if (playing) "Pause" else "Play",
             tint = tint,
             modifier = Modifier.size(size)
         )

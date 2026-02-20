@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.zIndex
 import androidx.media3.common.util.UnstableApi
 import com.jyotirmoy.musicly.data.model.Song
+import com.jyotirmoy.musicly.data.model.toMediaMetadata
 import com.jyotirmoy.musicly.presentation.viewmodel.PlayerViewModel
 import com.jyotirmoy.musicly.presentation.viewmodel.StablePlayerState
 import kotlinx.collections.immutable.ImmutableList
@@ -163,66 +164,129 @@ internal fun UnifiedPlayerSongInfoLayer(
         }.collectAsState(initial = staticSong)
 
         val liveSong = liveSongState
+        val isOnline = remember(liveSong.contentUriString) {
+            liveSong.contentUriString.startsWith("https://music.youtube.com")
+        }
 
         MaterialTheme(
             colorScheme = albumColorScheme,
             typography = MaterialTheme.typography,
             shapes = MaterialTheme.shapes
         ) {
-            SongInfoBottomSheet(
-                song = liveSong,
-                isFavorite = liveSong.isFavorite,
-                onToggleFavorite = { playerViewModel.toggleFavoriteSpecificSong(liveSong) },
-                onDismiss = onDismissSongInfo,
-                onPlaySong = {
-                    playerViewModel.showAndPlaySong(
-                        song = liveSong,
-                        contextSongs = currentPlaybackQueueProvider(),
-                        queueName = currentQueueSourceNameProvider()
-                    )
-                    onDismissSongInfo()
-                },
-                onAddToQueue = {
-                    playerViewModel.addSongToQueue(liveSong)
-                    onDismissSongInfo()
-                    Toast.makeText(context, "Added to queue", Toast.LENGTH_SHORT).show()
-                },
-                onAddNextToQueue = {
-                    playerViewModel.addSongNextToQueue(liveSong)
-                    onDismissSongInfo()
-                    Toast.makeText(context, "Playing next", Toast.LENGTH_SHORT).show()
-                },
-                onAddToPlayList = {
-                    Log.d("UnifiedPlayerSheet", "Add to playlist clicked for ${liveSong.title}")
-                    onDismissSongInfo()
-                },
-                onDeleteFromDevice = { activity, songToDelete, onResult ->
-                    playerViewModel.deleteFromDevice(activity, songToDelete, onResult)
-                    onDismissSongInfo()
-                },
-                onNavigateToAlbum = { onNavigateToAlbum(liveSong) },
-                onNavigateToArtist = { onNavigateToArtist(liveSong) },
-                onEditSong = { title, artist, album, genre, lyrics, trackNumber, coverArtUpdate ->
-                    playerViewModel.editSongMetadata(
-                        liveSong,
-                        title,
-                        artist,
-                        album,
-                        genre,
-                        lyrics,
-                        trackNumber,
-                        coverArtUpdate
-                    )
-                    onDismissSongInfo()
-                },
-                generateAiMetadata = { fields ->
-                    playerViewModel.generateAiMetadata(liveSong, fields)
-                },
-                removeFromListTrigger = {
-                    playerViewModel.removeSongFromQueue(liveSong.id)
-                    onDismissSongInfo()
-                }
-            )
+            if (isOnline) {
+                OnlineSongOptionsBottomSheet(
+                    metadata = liveSong.toMediaMetadata(),
+                    menuContext = OnlineSongMenuContext.QUEUE,
+                    onDismiss = onDismissSongInfo,
+                    onPlaySong = {
+                        playerViewModel.showAndPlaySong(
+                            song = liveSong,
+                            contextSongs = currentPlaybackQueueProvider(),
+                            queueName = currentQueueSourceNameProvider()
+                        )
+                        onDismissSongInfo()
+                    },
+                    onAddToQueue = {
+                        // Already in queue usually, but if user clicked from search results that were added to queue...
+                        // This action adds a DUPLICATE to the end
+                        playerViewModel.addSongToQueue(liveSong)
+                        onDismissSongInfo()
+                        Toast.makeText(context, "Added to queue", Toast.LENGTH_SHORT).show()
+                    },
+                    onPlayNext = {
+                        playerViewModel.addSongNextToQueue(liveSong)
+                        onDismissSongInfo()
+                        Toast.makeText(context, "Playing next", Toast.LENGTH_SHORT).show()
+                    },
+                    onStartRadio = {
+                        playerViewModel.startRadio(liveSong.toMediaMetadata())
+                        onDismissSongInfo()
+                    },
+                    onAddToPlaylist = {
+                        // TODO: Implement Add to Playlist
+                        Toast.makeText(context, "Add to Playlist not implemented yet", Toast.LENGTH_SHORT).show()
+                        onDismissSongInfo()
+                    },
+                    onDownload = {
+                        // TODO: Implement Download
+                        Toast.makeText(context, "Download not implemented yet", Toast.LENGTH_SHORT).show()
+                        onDismissSongInfo()
+                    },
+                    onRemoveFromQueue = {
+                        playerViewModel.removeSongFromQueue(liveSong.id)
+                        onDismissSongInfo()
+                    },
+                    onNavigateToArtist = { artistId ->
+                        // Online navigation not fully wired in this layer's callbacks, 
+                        // but we can try to use the passed onNavigateToArtist if it supports ID lookup or generic
+                        // For now, we'll map to the existing callback which takes a Song
+                        // but online songs usually have dummy artist IDs.
+                        // Ideally we should navigate by browseId.
+                        // The existing onNavigateToArtist takes a Song.
+                        onNavigateToArtist(liveSong)
+                        onDismissSongInfo()
+                    },
+                    onNavigateToAlbum = { albumId ->
+                        onNavigateToAlbum(liveSong)
+                        onDismissSongInfo()
+                    }
+                )
+            } else {
+                SongInfoBottomSheet(
+                    song = liveSong,
+                    isFavorite = liveSong.isFavorite,
+                    onToggleFavorite = { playerViewModel.toggleFavoriteSpecificSong(liveSong) },
+                    onDismiss = onDismissSongInfo,
+                    onPlaySong = {
+                        playerViewModel.showAndPlaySong(
+                            song = liveSong,
+                            contextSongs = currentPlaybackQueueProvider(),
+                            queueName = currentQueueSourceNameProvider()
+                        )
+                        onDismissSongInfo()
+                    },
+                    onAddToQueue = {
+                        playerViewModel.addSongToQueue(liveSong)
+                        onDismissSongInfo()
+                        Toast.makeText(context, "Added to queue", Toast.LENGTH_SHORT).show()
+                    },
+                    onAddNextToQueue = {
+                        playerViewModel.addSongNextToQueue(liveSong)
+                        onDismissSongInfo()
+                        Toast.makeText(context, "Playing next", Toast.LENGTH_SHORT).show()
+                    },
+                    onAddToPlayList = {
+                        Log.d("UnifiedPlayerSheet", "Add to playlist clicked for ${liveSong.title}")
+                        onDismissSongInfo()
+                    },
+                    onDeleteFromDevice = { activity, songToDelete, onResult ->
+                        playerViewModel.deleteFromDevice(activity, songToDelete, onResult)
+                        onDismissSongInfo()
+                    },
+                    onNavigateToAlbum = { onNavigateToAlbum(liveSong) },
+                    onNavigateToArtist = { onNavigateToArtist(liveSong) },
+                    onEditSong = { title, artist, album, genre, lyrics, trackNumber, coverArtUpdate ->
+                        playerViewModel.editSongMetadata(
+                            liveSong,
+                            title,
+                            artist,
+                            album,
+                            genre,
+                            lyrics,
+                            trackNumber,
+                            coverArtUpdate
+                        )
+                        onDismissSongInfo()
+                    },
+                    generateAiMetadata = { fields ->
+                        playerViewModel.generateAiMetadata(liveSong, fields)
+                    },
+                    removeFromListTrigger = {
+                        playerViewModel.removeSongFromQueue(liveSong.id)
+                        onDismissSongInfo()
+                    }
+                )
+            }
         }
     }
 }
