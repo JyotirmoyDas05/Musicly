@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.MoreVert
 
@@ -76,6 +77,10 @@ fun OnlineSongOptionsBottomSheet(
     onStartRadio: () -> Unit,
     onAddToPlaylist: () -> Unit,
     onDownload: () -> Unit,
+    isDownloaded: Boolean = false,
+    isDownloading: Boolean = false,
+    downloadProgress: Float? = null,
+    onDeleteDownloaded: (() -> Unit)? = null,
     onRemoveFromQueue: (() -> Unit)? = null,
     onNavigateToArtist: ((String) -> Unit)? = null,
     onNavigateToAlbum: ((String) -> Unit)? = null,
@@ -215,22 +220,45 @@ fun OnlineSongOptionsBottomSheet(
                                         contentDescription = "Add to Playlist"
                                     )
                                 }
-                                // Download
-                                FilledTonalIconButton(
-                                    modifier = Modifier
-                                        .weight(0.25f)
-                                        .fillMaxHeight(),
-                                    onClick = {
-                                        onDownload()
-                                        onDismiss()
-                                    },
-                                    shape = CircleShape,
-                                ) {
-                                    Icon(
-                                        modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize),
-                                        imageVector = Icons.Rounded.Download,
-                                        contentDescription = "Download"
-                                    )
+                                // Download / Delete
+                                if (isDownloaded && onDeleteDownloaded != null) {
+                                    FilledTonalIconButton(
+                                        modifier = Modifier
+                                            .weight(0.25f)
+                                            .fillMaxHeight(),
+                                        onClick = {
+                                            onDeleteDownloaded()
+                                            onDismiss()
+                                        },
+                                        shape = CircleShape,
+                                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    ) {
+                                        Icon(
+                                            modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize),
+                                            imageVector = Icons.Rounded.DeleteForever,
+                                            contentDescription = "Delete from Device"
+                                        )
+                                    }
+                                } else {
+                                    FilledTonalIconButton(
+                                        modifier = Modifier
+                                            .weight(0.25f)
+                                            .fillMaxHeight(),
+                                        onClick = {
+                                            onDownload()
+                                            onDismiss()
+                                        },
+                                        shape = CircleShape,
+                                    ) {
+                                        Icon(
+                                            modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize),
+                                            imageVector = Icons.Rounded.Download,
+                                            contentDescription = "Download"
+                                        )
+                                    }
                                 }
                             }
                             OnlineSongMenuContext.PLAYER -> {
@@ -272,22 +300,45 @@ fun OnlineSongOptionsBottomSheet(
                                         contentDescription = "Add to Playlist"
                                     )
                                 }
-                                // Download
-                                FilledTonalIconButton(
-                                    modifier = Modifier
-                                        .weight(0.25f)
-                                        .fillMaxHeight(),
-                                    onClick = {
-                                        onDownload()
-                                        onDismiss()
-                                    },
-                                    shape = CircleShape,
-                                ) {
-                                    Icon(
-                                        modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize),
-                                        imageVector = Icons.Rounded.Download,
-                                        contentDescription = "Download"
-                                    )
+                                // Download / Delete
+                                if (isDownloaded && onDeleteDownloaded != null) {
+                                    FilledTonalIconButton(
+                                        modifier = Modifier
+                                            .weight(0.25f)
+                                            .fillMaxHeight(),
+                                        onClick = {
+                                            onDeleteDownloaded()
+                                            onDismiss()
+                                        },
+                                        shape = CircleShape,
+                                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    ) {
+                                        Icon(
+                                            modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize),
+                                            imageVector = Icons.Rounded.DeleteForever,
+                                            contentDescription = "Delete from Device"
+                                        )
+                                    }
+                                } else {
+                                    FilledTonalIconButton(
+                                        modifier = Modifier
+                                            .weight(0.25f)
+                                            .fillMaxHeight(),
+                                        onClick = {
+                                            onDownload()
+                                            onDismiss()
+                                        },
+                                        shape = CircleShape,
+                                    ) {
+                                        Icon(
+                                            modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize),
+                                            imageVector = Icons.Rounded.Download,
+                                            contentDescription = "Download"
+                                        )
+                                    }
                                 }
                             }
                             OnlineSongMenuContext.QUEUE -> {
@@ -329,22 +380,66 @@ fun OnlineSongOptionsBottomSheet(
                                         contentDescription = "Add to Playlist"
                                     )
                                 }
-                                // Download
-                                FilledTonalIconButton(
-                                    modifier = Modifier
-                                        .weight(0.25f)
-                                        .fillMaxHeight(),
-                                    onClick = {
-                                        onDownload()
-                                        onDismiss()
-                                    },
-                                    shape = CircleShape,
-                                ) {
-                                    Icon(
-                                        modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize),
-                                        imageVector = Icons.Rounded.Download,
-                                        contentDescription = "Download"
-                                    )
+                                // Download / Delete
+                                if (isDownloaded && onDeleteDownloaded != null) {
+                                    // Delete button
+                                    FilledTonalIconButton(
+                                        modifier = Modifier
+                                            .weight(0.25f)
+                                            .fillMaxHeight(),
+                                        onClick = {
+                                            onDeleteDownloaded()
+                                            onDismiss()
+                                        },
+                                        shape = CircleShape,
+                                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    ) {
+                                        Icon(
+                                            modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize),
+                                            imageVector = Icons.Rounded.DeleteForever,
+                                            contentDescription = "Delete from Device"
+                                        )
+                                    }
+                                } else {
+                                    // Download button — shows circular progress ring while downloading
+                                    FilledTonalIconButton(
+                                        modifier = Modifier
+                                            .weight(0.25f)
+                                            .fillMaxHeight(),
+                                        enabled = !isDownloading,
+                                        onClick = {
+                                            if (!isDownloading) onDownload()
+                                        },
+                                        shape = CircleShape,
+                                    ) {
+                                        androidx.compose.foundation.layout.Box(
+                                            contentAlignment = androidx.compose.ui.Alignment.Center
+                                        ) {
+                                            if (isDownloading) {
+                                                if (downloadProgress != null && downloadProgress > 0f) {
+                                                    CircularProgressIndicator(
+                                                        progress = { downloadProgress },
+                                                        modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize),
+                                                        strokeWidth = 2.5.dp
+                                                    )
+                                                } else {
+                                                    CircularProgressIndicator(
+                                                        modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize),
+                                                        strokeWidth = 2.5.dp
+                                                    )
+                                                }
+                                            } else {
+                                                Icon(
+                                                    modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize),
+                                                    imageVector = Icons.Rounded.Download,
+                                                    contentDescription = "Download"
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

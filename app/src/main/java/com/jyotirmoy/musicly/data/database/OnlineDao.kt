@@ -55,6 +55,15 @@ interface OnlineDao {
     @Query("UPDATE online_songs SET in_library = :inLibrary WHERE id = :videoId")
     suspend fun setInLibrary(videoId: String, inLibrary: Boolean)
 
+    @Query("UPDATE online_songs SET is_downloaded = :isDownloaded, date_downloaded = :date WHERE id = :videoId")
+    suspend fun updateDownloadState(videoId: String, isDownloaded: Boolean, date: Long?)
+
+    @Query("SELECT * FROM online_songs WHERE id IN (:ids)")
+    suspend fun getOnlineSongsByIds(ids: List<String>): List<OnlineSongEntity>
+
+    @Query("SELECT * FROM online_songs WHERE is_downloaded = 1 ORDER BY date_downloaded DESC")
+    fun observeDownloadedSongs(): Flow<List<OnlineSongEntity>>
+
     @Query("DELETE FROM online_songs WHERE id = :videoId")
     suspend fun deleteOnlineSong(videoId: String)
 

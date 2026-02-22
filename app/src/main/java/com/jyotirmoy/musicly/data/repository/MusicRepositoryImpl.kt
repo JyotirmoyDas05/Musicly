@@ -1,82 +1,55 @@
 package com.jyotirmoy.musicly.data.repository
 
-import android.content.ContentResolver
-import android.content.ContentUris
 import android.content.Context
-import android.database.Cursor
 import android.net.Uri
-import android.os.Build
-import android.os.Bundle
-import android.os.Environment
-import android.provider.MediaStore
 import android.util.Log
-import com.jyotirmoy.musicly.data.model.Song
-import com.jyotirmoy.musicly.data.database.MusicDao
-import com.jyotirmoy.musicly.data.database.FavoritesDao
-import com.jyotirmoy.musicly.data.repository.ArtistImageRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
-// import kotlinx.coroutines.withContext // May not be needed for Flow transformations
-import javax.inject.Inject
-import javax.inject.Singleton
-import androidx.core.net.toUri
-import com.jyotirmoy.musicly.data.model.Album
-import com.jyotirmoy.musicly.data.database.SearchHistoryDao
-import com.jyotirmoy.musicly.data.database.SearchHistoryEntity
-import com.jyotirmoy.musicly.data.database.toSearchHistoryItem
-import com.jyotirmoy.musicly.data.model.Artist
-import com.jyotirmoy.musicly.data.model.Playlist
-import com.jyotirmoy.musicly.data.model.SearchFilterType
-import com.jyotirmoy.musicly.data.model.SearchHistoryItem
-import com.jyotirmoy.musicly.data.model.SearchResultItem
-import com.jyotirmoy.musicly.data.model.SortOption
-import com.jyotirmoy.musicly.data.model.FolderSource
-import com.jyotirmoy.musicly.data.preferences.UserPreferencesRepository
-import androidx.sqlite.db.SimpleSQLiteQuery
-
-import com.jyotirmoy.musicly.data.model.Genre
-import com.jyotirmoy.musicly.data.database.SongEntity
-import com.jyotirmoy.musicly.data.database.SongArtistCrossRef
-import com.jyotirmoy.musicly.data.database.ArtistEntity
-import com.jyotirmoy.musicly.data.database.toAlbum
-import com.jyotirmoy.musicly.data.database.toArtist
-import com.jyotirmoy.musicly.data.database.toSong
-import com.jyotirmoy.musicly.data.database.toSongWithArtistRefs
-import com.jyotirmoy.musicly.data.model.Lyrics
-import com.jyotirmoy.musicly.data.model.LyricsSourcePreference
-import com.jyotirmoy.musicly.data.model.SyncedLine
-import com.jyotirmoy.musicly.utils.LogUtils
-import com.jyotirmoy.musicly.data.model.MusicFolder
-import com.jyotirmoy.musicly.utils.LyricsUtils
-import com.jyotirmoy.musicly.utils.DirectoryRuleResolver
-import com.jyotirmoy.musicly.utils.StorageType
-import com.jyotirmoy.musicly.utils.StorageUtils
-import kotlinx.coroutines.flow.conflate
-import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first // Still needed for initialSetupDoneFlow.first() if used that way
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
-// import kotlinx.coroutines.sync.withLock // May not be needed if directoryScanMutex logic changes
-import java.io.File
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
-import androidx.paging.filter
-import kotlinx.coroutines.launch
+import com.jyotirmoy.musicly.data.database.MusicDao
+import com.jyotirmoy.musicly.data.database.SearchHistoryDao
+import com.jyotirmoy.musicly.data.database.SearchHistoryEntity
+import com.jyotirmoy.musicly.data.database.toEntity
+import com.jyotirmoy.musicly.data.database.toSearchHistoryItem
+import com.jyotirmoy.musicly.data.database.toSong
+import com.jyotirmoy.musicly.data.database.toAlbum
+import com.jyotirmoy.musicly.data.database.toArtist
+import com.jyotirmoy.musicly.data.database.OnlineDao
+import com.jyotirmoy.musicly.data.database.toSong as onlineToSong
+import com.jyotirmoy.musicly.data.model.Album
+import com.jyotirmoy.musicly.data.model.Artist
+import com.jyotirmoy.musicly.data.model.Genre
+import com.jyotirmoy.musicly.data.model.Lyrics
+import com.jyotirmoy.musicly.data.model.LyricsSourcePreference
+import com.jyotirmoy.musicly.data.model.MusicFolder
+import com.jyotirmoy.musicly.data.model.Playlist
+import com.jyotirmoy.musicly.data.model.SearchFilterType
+import com.jyotirmoy.musicly.data.model.SearchHistoryItem
+import com.jyotirmoy.musicly.data.model.SearchResultItem
+import com.jyotirmoy.musicly.data.model.Song
+import com.jyotirmoy.musicly.data.model.SortOption
+import com.jyotirmoy.musicly.data.preferences.UserPreferencesRepository
+import com.jyotirmoy.musicly.utils.LogUtils
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
+import java.io.File
+import javax.inject.Inject
+import javax.inject.Singleton
+import androidx.media3.datasource.cache.SimpleCache
+import com.jyotirmoy.musicly.di.DownloadCache
+import com.jyotirmoy.musicly.di.PlayerCache
+import kotlinx.coroutines.delay
 
-@OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
 class MusicRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -85,218 +58,155 @@ class MusicRepositoryImpl @Inject constructor(
     private val musicDao: MusicDao,
     private val lyricsRepository: LyricsRepository,
     private val songRepository: SongRepository,
-    private val favoritesDao: FavoritesDao,
+    private val favoritesDao: com.jyotirmoy.musicly.data.database.FavoritesDao,
+    private val onlineDao: OnlineDao,
     private val artistImageRepository: ArtistImageRepository,
-    private val folderTreeBuilder: FolderTreeBuilder
+    private val folderTreeBuilder: FolderTreeBuilder,
+    @PlayerCache private val playerCache: SimpleCache,
+    @DownloadCache private val downloadCache: SimpleCache
 ) : MusicRepository {
 
-    companion object {
-        /** Maximum number of search results to load at once to avoid memory issues with large libraries. */
-        private const val SEARCH_RESULTS_LIMIT = 100
-    }
+    override fun getAudioFiles(): Flow<List<Song>> = songRepository.getSongs()
 
-    private val directoryScanMutex = Mutex()
-
-    private fun normalizePath(path: String): String =
-        runCatching { File(path).canonicalPath }.getOrElse { File(path).absolutePath }
-
-
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    override fun getAudioFiles(): Flow<List<Song>> {
+    override fun getPaginatedSongs(sortOption: SortOption): Flow<PagingData<Song>> {
         return combine(
             userPreferencesRepository.allowedDirectoriesFlow,
-            userPreferencesRepository.blockedDirectoriesFlow
-        ) { allowedDirs, blockedDirs ->
-            allowedDirs to blockedDirs
-        }.flatMapLatest { (allowedDirs, blockedDirs) ->
-            flow {
-                val (allowedParentDirs, applyDirectoryFilter) =
-                    computeAllowedDirs(allowedDirs, blockedDirs)
-                emit(
-                    musicDao.getAllSongs(
-                        allowedParentDirs = allowedParentDirs,
-                        applyDirectoryFilter = applyDirectoryFilter
-                    )
-                )
-            }.flatMapLatest { it }
-        }.map { entities ->
-            entities.map { it.toSong() }
+            userPreferencesRepository.isFolderFilterActiveFlow
+        ) { allowedDirs, filterActive ->
+            allowedDirs to filterActive
+        }.flatMapLatest { pair ->
+            val allowedDirs = pair.first
+            val filterActive = pair.second
+            Pager(
+                config = PagingConfig(pageSize = 50, enablePlaceholders = true),
+                pagingSourceFactory = { musicDao.getSongsPaginated(allowedDirs.toList(), filterActive, sortOption.storageKey) }
+            ).flow.map { pagingData -> pagingData.map { it.toSong() } }
+        }
+    }
+
+    override fun getPaginatedFavoriteSongs(sortOption: SortOption): Flow<PagingData<Song>> {
+        return combine(
+            userPreferencesRepository.allowedDirectoriesFlow,
+            userPreferencesRepository.isFolderFilterActiveFlow,
+            onlineDao.observeFavoriteSongs(),
+            musicDao.getFavoriteSongsListFlow(emptyList(), false) // Dummy flow to trigger on local db changes
+        ) { allowedDirs, filterActive, onlineFavorites, _ ->
+            // Fetch local favorites directly
+            val localFavorites = musicDao.getFavoriteSongsList(allowedDirs.toList(), filterActive).map { it.toSong() }
+
+            val onlineSongs = onlineFavorites.map { it.onlineToSong() }
+
+            // Deduping: remote online songs which are already matched to local favorites.
+            // (Note: Local ids are Long, while Online ids are String. Since they don't overlap,
+            // we will just combine them. We sort the list together.)
+            val combined = (localFavorites + onlineSongs).sortedByDescending { it.dateAdded }
+
+            PagingData.from(combined)
         }.flowOn(Dispatchers.IO)
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    override fun getPaginatedSongs(sortOption: com.jyotirmoy.musicly.data.model.SortOption): Flow<PagingData<Song>> {
-        return songRepository.getPaginatedSongs(sortOption)
-    }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    override fun getPaginatedFavoriteSongs(sortOption: com.jyotirmoy.musicly.data.model.SortOption): Flow<PagingData<Song>> {
-        return songRepository.getPaginatedFavoriteSongs(sortOption)
-    }
-
-    override suspend fun getFavoriteSongsOnce(): List<Song> {
-        return songRepository.getFavoriteSongsOnce()
+    override suspend fun getFavoriteSongsOnce(): List<Song> = withContext(Dispatchers.IO) {
+        val allowedDirs = userPreferencesRepository.allowedDirectoriesFlow.first()
+        val filterActive = userPreferencesRepository.isFolderFilterActiveFlow.first()
+        musicDao.getFavoriteSongsList(allowedDirs.toList(), filterActive).map { it.toSong() }
     }
 
     override fun getFavoriteSongCountFlow(): Flow<Int> {
-        return songRepository.getFavoriteSongCountFlow()
+        return combine(
+            userPreferencesRepository.allowedDirectoriesFlow,
+            userPreferencesRepository.isFolderFilterActiveFlow
+        ) { allowedDirs, filterActive ->
+            musicDao.getFavoriteSongCount(allowedDirs.toList(), filterActive)
+        }.flatMapLatest { it }
     }
 
-    override fun getSongCountFlow(): Flow<Int> {
-        return musicDao.getSongCount()
-    }
+    override fun getSongCountFlow(): Flow<Int> = musicDao.getSongCount()
 
     override suspend fun getRandomSongs(limit: Int): List<Song> = withContext(Dispatchers.IO) {
-        musicDao.getRandomSongs(limit).map { it.toSong() }
+        val allowedDirs = userPreferencesRepository.allowedDirectoriesFlow.first()
+        val filterActive = userPreferencesRepository.isFolderFilterActiveFlow.first()
+        musicDao.getRandomSongs(limit, allowedDirs.toList(), filterActive).map { it.toSong() }
     }
 
-    /**
-     * Compute allowed parent directories by subtracting blocked dirs from all known dirs.
-     * Returns Pair(allowedDirs, applyFilter) for use with Room DAO filtered queries.
-     */
-    private suspend fun computeAllowedDirs(
-        allowedDirs: Set<String>,
-        blockedDirs: Set<String>
-    ): Pair<List<String>, Boolean> {
-        if (blockedDirs.isEmpty()) return Pair(emptyList(), false)
-        val resolver = DirectoryRuleResolver(
-            allowedDirs.map(::normalizePath).toSet(),
-            blockedDirs.map(::normalizePath).toSet()
-        )
-        val allDirs = musicDao.getDistinctParentDirectories()
-        val allowed = allDirs.filter { !resolver.isBlocked(normalizePath(it)) }
-        return Pair(allowed, true)
-    }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
     override fun getAlbums(): Flow<List<Album>> {
         return combine(
             userPreferencesRepository.allowedDirectoriesFlow,
-            userPreferencesRepository.blockedDirectoriesFlow
-        ) { allowedDirs, blockedDirs ->
-            allowedDirs to blockedDirs
-        }.flatMapLatest { (allowedDirs, blockedDirs) ->
-            val (allowedParentDirs, applyFilter) = computeAllowedDirs(allowedDirs, blockedDirs)
-            musicDao.getAlbums(allowedParentDirs, applyFilter)
-                .map { entities -> entities.map { it.toAlbum() } }
-        }.flowOn(Dispatchers.IO)
+            userPreferencesRepository.isFolderFilterActiveFlow
+        ) { allowedDirs, filterActive ->
+            musicDao.getAlbums(allowedDirs.toList(), filterActive).map { albums ->
+                albums.map { it.toAlbum() }
+            }
+        }.flatMapLatest { it }.flowOn(Dispatchers.IO)
     }
 
-    override fun getAlbumById(id: Long): Flow<Album?> {
-        return musicDao.getAlbumById(id).map { it?.toAlbum() }
-    }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
     override fun getArtists(): Flow<List<Artist>> {
         return combine(
             userPreferencesRepository.allowedDirectoriesFlow,
-            userPreferencesRepository.blockedDirectoriesFlow
-        ) { allowedDirs, blockedDirs ->
-            allowedDirs to blockedDirs
-        }.flatMapLatest { (allowedDirs, blockedDirs) ->
-            val (allowedParentDirs, applyFilter) = computeAllowedDirs(allowedDirs, blockedDirs)
-            musicDao.getArtistsWithSongCountsFiltered(allowedParentDirs, applyFilter)
-                .map { entities ->
-                    val artists = entities.map { it.toArtist() }
-                    // Trigger prefetch for missing images (fire-and-forget on existing scope)
-                    val missingImages = artists.asSequence()
-                        .filter { it.imageUrl.isNullOrEmpty() && it.name.isNotBlank() }
-                        .map { it.id to it.name }
-                        .distinctBy { (_, name) -> name.trim().lowercase() }
-                        .toList()
-                    if (missingImages.isNotEmpty()) {
-                        artistImageRepository.prefetchArtistImages(missingImages)
-                    }
-                    artists
-                }
-        }.flowOn(Dispatchers.IO)
+            userPreferencesRepository.isFolderFilterActiveFlow
+        ) { allowedDirs, filterActive ->
+            musicDao.getArtistsWithSongCountsFiltered(allowedDirs.toList(), filterActive).map { artists ->
+                artists.map { it.toArtist() }
+            }
+        }.flatMapLatest { it }.flowOn(Dispatchers.IO)
+    }
+
+    override fun getAlbumById(id: Long): Flow<Album?> {
+        return musicDao.getAlbumById(id).map { it?.toAlbum() }.flowOn(Dispatchers.IO)
     }
 
     override fun getSongsForAlbum(albumId: Long): Flow<List<Song>> {
-        return musicDao.getSongsByAlbumId(albumId).map { entities ->
-            entities.map { it.toSong() }.sortedBy { it.trackNumber }
-        }.flowOn(Dispatchers.IO)
-    }
-
-    override fun getArtistById(artistId: Long): Flow<Artist?> {
-        return musicDao.getArtistById(artistId).map { it?.toArtist() }
-    }
-
-    override fun getArtistsForSong(songId: Long): Flow<List<Artist>> {
-        return musicDao.getArtistsForSong(songId).map { entities ->
-            entities.map { it.toArtist() }
-        }.flowOn(Dispatchers.IO)
+        return musicDao.getSongsByAlbumId(albumId).map { it.map { entity -> entity.toSong() } }.flowOn(Dispatchers.IO)
     }
 
     override fun getSongsForArtist(artistId: Long): Flow<List<Song>> {
-        return musicDao.getSongsForArtist(artistId).map { entities ->
-            entities.map { it.toSong() }
-        }.flowOn(Dispatchers.IO)
+        return musicDao.getSongsByArtistId(artistId).map { it.map { entity -> entity.toSong() } }.flowOn(Dispatchers.IO)
     }
 
-    override suspend fun getAllUniqueAudioDirectories(): Set<String> = withContext(Dispatchers.IO) {
-        LogUtils.d(this, "getAllUniqueAudioDirectories")
-        directoryScanMutex.withLock {
-            val directories = mutableSetOf<String>()
-            val projection = arrayOf(MediaStore.Audio.Media.DATA)
-            val selection = "(${MediaStore.Audio.Media.IS_MUSIC} != 0 OR ${MediaStore.Audio.Media.DATA} LIKE '%.m4a' OR ${MediaStore.Audio.Media.DATA} LIKE '%.flac')"
-            context.contentResolver.query(
-                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                projection, selection, null, null
-            )?.use { c ->
-                val dataColumn = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
-                while (c.moveToNext()) {
-                    File(c.getString(dataColumn)).parent?.let { directories.add(it) }
-                }
-            }
-            LogUtils.i(this, "Found ${directories.size} unique audio directories")
-            return@withLock directories
+    override suspend fun getAllUniqueAudioDirectories(): Set<String> {
+        return withContext(Dispatchers.IO) {
+            musicDao.getDistinctParentDirectories().toSet()
         }
     }
 
     override fun getAllUniqueAlbumArtUris(): Flow<List<Uri>> {
-        return musicDao.getAllUniqueAlbumArtUrisFromSongs().map { uriStrings ->
-            uriStrings.mapNotNull { it.toUri() }
-        }.flowOn(Dispatchers.IO)
+        return musicDao.getAllUniqueAlbumArtUrisFromSongs().map { list -> list.mapNotNull { Uri.parse(it) } }
     }
-
-    // --- Search Methods ---
 
     override fun searchSongs(query: String): Flow<List<Song>> {
-        if (query.isBlank()) return flowOf(emptyList())
-        // Use limited search to avoid loading thousands of results into memory
-        return musicDao.searchSongsLimited(query, emptyList(), false, SEARCH_RESULTS_LIMIT).map { entities ->
-            entities.map { it.toSong() }
-        }.flowOn(Dispatchers.IO)
+        return combine(
+            userPreferencesRepository.allowedDirectoriesFlow,
+            userPreferencesRepository.isFolderFilterActiveFlow
+        ) { allowedDirs, filterActive ->
+            musicDao.searchSongs(query, allowedDirs.toList(), filterActive).map { list -> list.map { it.toSong() } }
+        }.flatMapLatest { it }.flowOn(Dispatchers.IO)
     }
 
-
     override fun searchAlbums(query: String): Flow<List<Album>> {
-        if (query.isBlank()) return flowOf(emptyList())
-        return musicDao.searchAlbums(query, emptyList(), false).map { entities ->
-            entities.map { it.toAlbum() }
-        }.flowOn(Dispatchers.IO)
+        return combine(
+            userPreferencesRepository.allowedDirectoriesFlow,
+            userPreferencesRepository.isFolderFilterActiveFlow
+        ) { allowedDirs, filterActive ->
+            musicDao.searchAlbums(query, allowedDirs.toList(), filterActive).map { list -> list.map { it.toAlbum() } }
+        }.flatMapLatest { it }.flowOn(Dispatchers.IO)
     }
 
     override fun searchArtists(query: String): Flow<List<Artist>> {
-        if (query.isBlank()) return flowOf(emptyList())
-        return musicDao.searchArtists(query, emptyList(), false).map { entities ->
-            entities.map { it.toArtist() }
-        }.flowOn(Dispatchers.IO)
+        return combine(
+            userPreferencesRepository.allowedDirectoriesFlow,
+            userPreferencesRepository.isFolderFilterActiveFlow
+        ) { allowedDirs, filterActive ->
+            musicDao.searchArtists(query, allowedDirs.toList(), filterActive).map { list -> list.map { it.toArtist() } }
+        }.flatMapLatest { it }.flowOn(Dispatchers.IO)
     }
 
     override suspend fun searchPlaylists(query: String): List<Playlist> {
-        if (query.isBlank()) return emptyList()
-        return userPreferencesRepository.userPlaylistsFlow.first()
-            .filter { playlist ->
-                playlist.name.contains(query, ignoreCase = true)
-            }
+        return emptyList() // Not implemented yet
     }
 
     override fun searchAll(query: String, filterType: SearchFilterType): Flow<List<SearchResultItem>> {
         if (query.isBlank()) return flowOf(emptyList())
-        val playlistsFlow = flow { emit(searchPlaylists(query)) }
+
+        val playlistsFlow = flowOf(emptyList<Playlist>())
 
         return when (filterType) {
             SearchFilterType.ALL -> {
@@ -328,10 +238,32 @@ class MusicRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun addSearchHistoryItemObj(item: SearchHistoryItem) {
+        withContext(Dispatchers.IO) {
+            if (item.itemType == "query") {
+                searchHistoryDao.deleteByQuery(item.query)
+            } else if (item.itemId != null) {
+                // Delete existing entry for this specific item ID to move it to top
+                searchHistoryDao.deleteByItemId(item.itemId)
+            } else {
+                // Fallback
+                searchHistoryDao.deleteByQuery(item.query)
+            }
+            // Always insert as a fresh entry with no ID (Room will auto-generate)
+            searchHistoryDao.insert(item.copy(id = null, timestamp = System.currentTimeMillis()).toEntity())
+        }
+    }
+
     override suspend fun getRecentSearchHistory(limit: Int): List<SearchHistoryItem> {
         return withContext(Dispatchers.IO) {
             searchHistoryDao.getRecentSearches(limit).map { it.toSearchHistoryItem() }
         }
+    }
+
+    override fun observeRecentSearchHistory(): Flow<List<SearchHistoryItem>> {
+        return searchHistoryDao.observeAll().map { entities ->
+            entities.map { it.toSearchHistoryItem() }
+        }.flowOn(Dispatchers.IO)
     }
 
     override suspend fun deleteSearchHistoryItemByQuery(query: String) {
@@ -349,22 +281,21 @@ class MusicRepositoryImpl @Inject constructor(
     override fun getMusicByGenre(genreId: String): Flow<List<Song>> {
         return userPreferencesRepository.mockGenresEnabledFlow.flatMapLatest { mockEnabled ->
             if (mockEnabled) {
-                // Mock mode: Use the static genre name for filtering.
-                val genreName = "Mock"//GenreDataSource.getStaticGenres().find { it.id.equals(genreId, ignoreCase = true) }?.name ?: genreId
-                getAudioFiles().map { songs ->
+                val genreName = "Mock"
+                songRepository.getSongs().map { songs ->
                     songs.filter { it.genre.equals(genreName, ignoreCase = true) }
                 }
             } else {
-                // Real mode: Use the genreId directly, which corresponds to the actual genre name from metadata.
-                getAudioFiles().map { songs ->
+                combine(
+                    userPreferencesRepository.allowedDirectoriesFlow,
+                    userPreferencesRepository.isFolderFilterActiveFlow
+                ) { allowedDirs, filterActive ->
                     if (genreId.equals("unknown", ignoreCase = true)) {
-                        // Filter for songs with no genre or an empty genre string.
-                        songs.filter { it.genre.isNullOrBlank() }
+                        musicDao.getSongsWithNullGenre(allowedDirs.toList(), filterActive)
                     } else {
-                        // Filter for songs that match the given genre name.
-                        songs.filter { it.genre.equals(genreId, ignoreCase = true) }
+                        musicDao.getSongsByGenre(genreId, allowedDirs.toList(), filterActive)
                     }
-                }
+                }.flatMapLatest { it }.map { list -> list.map { it.toSong() } }
             }
         }.flowOn(Dispatchers.IO)
     }
@@ -373,9 +304,14 @@ class MusicRepositoryImpl @Inject constructor(
         if (songIds.isEmpty()) return flowOf(emptyList())
         val longIds = songIds.mapNotNull { it.toLongOrNull() }
         if (longIds.isEmpty()) return flowOf(emptyList())
-        return musicDao.getSongsByIds(longIds, emptyList(), false).map { entities ->
+        
+        return combine(
+            userPreferencesRepository.allowedDirectoriesFlow,
+            userPreferencesRepository.isFolderFilterActiveFlow
+        ) { allowedDirs, filterActive ->
+            musicDao.getSongsByIds(longIds, allowedDirs.toList(), filterActive)
+        }.flatMapLatest { it }.map { entities ->
             val songMap = entities.associate { it.id.toString() to it.toSong() }
-            // Preserve the requested order
             songIds.mapNotNull { songMap[it] }
         }.flowOn(Dispatchers.IO)
     }
@@ -390,33 +326,28 @@ class MusicRepositoryImpl @Inject constructor(
         Log.i("MusicRepo", "invalidateCachesDependentOnAllowedDirectories called. Reactive flows will update automatically.")
     }
 
-    suspend fun syncMusicFromContentResolver() {
-        // This function is now in SyncWorker. The skeleton is left in case it is called from elsewhere.
-        Log.w("MusicRepo", "syncMusicFromContentResolver was called directly on repository. This should be handled by SyncWorker.")
-    }
-
-    // Implementation of the new suspend functions for one-time loading
     override suspend fun getAllSongsOnce(): List<Song> = withContext(Dispatchers.IO) {
-        musicDao.getAllSongsList().map { it.toSong() }
+        val allowedDirs = userPreferencesRepository.allowedDirectoriesFlow.first()
+        val filterActive = userPreferencesRepository.isFolderFilterActiveFlow.first()
+        musicDao.getAllSongs(allowedDirs.toList(), filterActive).first().map { it.toSong() }
     }
 
     override suspend fun getAllAlbumsOnce(): List<Album> = withContext(Dispatchers.IO) {
-        musicDao.getAllAlbumsList(emptyList(), false).map { it.toAlbum() }
+        val allowedDirs = userPreferencesRepository.allowedDirectoriesFlow.first()
+        val filterActive = userPreferencesRepository.isFolderFilterActiveFlow.first()
+        musicDao.getAllAlbumsList(allowedDirs.toList(), filterActive).map { it.toAlbum() }
     }
 
     override suspend fun getAllArtistsOnce(): List<Artist> = withContext(Dispatchers.IO) {
-        musicDao.getAllArtistsListRaw().map { it.toArtist() }
+        val allowedDirs = userPreferencesRepository.allowedDirectoriesFlow.first()
+        val filterActive = userPreferencesRepository.isFolderFilterActiveFlow.first()
+        musicDao.getArtists(allowedDirs.toList(), filterActive).first().map { it.toArtist() }
     }
 
     override suspend fun setFavoriteStatus(songId: String, isFavorite: Boolean) = withContext(Dispatchers.IO) {
         val id = songId.toLongOrNull() ?: return@withContext
         if (isFavorite) {
-            favoritesDao.setFavorite(
-                com.jyotirmoy.musicly.data.database.FavoritesEntity(
-                    songId = id,
-                    isFavorite = true
-                )
-            )
+            favoritesDao.setFavorite(com.jyotirmoy.musicly.data.database.FavoritesEntity(songId = id, isFavorite = true))
         } else {
             favoritesDao.removeFavorite(id)
         }
@@ -424,9 +355,7 @@ class MusicRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getFavoriteSongIdsOnce(): Set<String> = withContext(Dispatchers.IO) {
-        favoritesDao.getFavoriteSongIdsOnce()
-            .map { it.toString() }
-            .toSet()
+        favoritesDao.getFavoriteSongIdsOnce().map { it.toString() }.toSet()
     }
 
     override suspend fun toggleFavoriteStatus(songId: String): Boolean = withContext(Dispatchers.IO) {
@@ -442,8 +371,16 @@ class MusicRepositoryImpl @Inject constructor(
         return musicDao.getSongById(id).map { it?.toSong() }.flowOn(Dispatchers.IO)
     }
 
+    override fun getArtistById(artistId: Long): Flow<Artist?> {
+        return musicDao.getArtistById(artistId).map { it?.toArtist() }.flowOn(Dispatchers.IO)
+    }
+
+    override fun getArtistsForSong(songId: Long): Flow<List<Artist>> {
+        return musicDao.getArtistsForSong(songId).map { it.map { entity -> entity.toArtist() } }.flowOn(Dispatchers.IO)
+    }
+
     override fun getGenres(): Flow<List<Genre>> {
-        return getAudioFiles().map { songs ->
+        return songRepository.getSongs().map { songs ->
             val genresMap = songs.groupBy { song ->
                 song.genre?.trim()?.takeIf { it.isNotBlank() } ?: "Unknown"
             }
@@ -452,28 +389,22 @@ class MusicRepositoryImpl @Inject constructor(
                 val id = if (genreName.equals("Unknown", ignoreCase = true)) {
                     "unknown"
                 } else {
-                    genreName
-                        .lowercase()
-                        .replace(" ", "_")
-                        .replace("/", "_")
+                    genreName.lowercase().replace(" ", "_").replace("/", "_")
                 }
-                // Generate colors dynamically or use a default for "Unknown"
                 val colorInt = genreName.hashCode()
                 val lightColorHex = "#${(colorInt and 0x00FFFFFF).toString(16).padStart(6, '0').uppercase()}"
-                // Simple inversion for dark color, or use a predefined set
                 val darkColorHex = "#${((colorInt xor 0xFFFFFF) and 0x00FFFFFF).toString(16).padStart(6, '0').uppercase()}"
 
                 Genre(
                     id = id,
                     name = genreName,
                     lightColorHex = lightColorHex,
-                    onLightColorHex = "#000000", // Default black for light theme text
+                    onLightColorHex = "#000000",
                     darkColorHex = darkColorHex,
-                    onDarkColorHex = "#FFFFFF"  // Default white for dark theme text
+                    onDarkColorHex = "#FFFFFF"
                 )
             }.sortedBy { it.name.lowercase() }
 
-            // Ensure "Unknown" genre is last if it exists.
             val unknownGenre = dynamicGenres.find { it.id == "unknown" }
             if (unknownGenre != null) {
                 (dynamicGenres.filterNot { it.id == "unknown" } + unknownGenre)
@@ -483,21 +414,10 @@ class MusicRepositoryImpl @Inject constructor(
         }.conflate().flowOn(Dispatchers.IO)
     }
 
-    override suspend fun getLyrics(
-        song: Song,
-        sourcePreference: LyricsSourcePreference,
-        forceRefresh: Boolean
-    ): Lyrics? {
+    override suspend fun getLyrics(song: Song, sourcePreference: LyricsSourcePreference, forceRefresh: Boolean): Lyrics? {
         return lyricsRepository.getLyrics(song, sourcePreference, forceRefresh)
     }
 
-    /**
-     * Gets the lyrics of a song from the LRCLIB API, persists it in the database
-     * and returns it as a parsed Lyrics object.
-     *
-     * @param song The song to search for lyrics.
-     * @return A Result object containing the Lyrics object if found, or an error.
-     */
     override suspend fun getLyricsFromRemote(song: Song): Result<Pair<Lyrics, String>> {
         return lyricsRepository.fetchFromRemote(song)
     }
@@ -524,7 +444,7 @@ class MusicRepositoryImpl @Inject constructor(
 
     override fun getMusicFolders(): Flow<List<MusicFolder>> {
         return combine(
-            getAudioFiles(),
+            songRepository.getSongs(),
             userPreferencesRepository.allowedDirectoriesFlow,
             userPreferencesRepository.blockedDirectoriesFlow,
             userPreferencesRepository.isFolderFilterActiveFlow,
@@ -540,6 +460,38 @@ class MusicRepositoryImpl @Inject constructor(
             )
         }.conflate().flowOn(Dispatchers.IO)
     }
+
+    override fun getDownloadedSongs(): Flow<List<Song>> {
+        return combine(
+            songRepository.getSongs(),
+            onlineDao.observeDownloadedSongs()
+        ) { localSongs, onlineDownloadedEntites ->
+            val onlineSongs = onlineDownloadedEntites.map { it.onlineToSong() }
+            (localSongs + onlineSongs).sortedBy { it.title.lowercase() }
+        }.flowOn(Dispatchers.Default)
+    }
+
+    override fun getCachedSongs(): Flow<List<Song>> = kotlinx.coroutines.flow.flow {
+        while (true) {
+            val cachedIds = playerCache.keys.toSet()
+            val downloadedIds = downloadCache.keys.toSet()
+            val pureCacheIds = cachedIds.subtract(downloadedIds)
+
+            if (pureCacheIds.isNotEmpty()) {
+                val songs = onlineDao.getOnlineSongsByIds(pureCacheIds.toList())
+                val completeSongs = songs.filter { ptr ->
+                    // Technically we don't have lengths stored explicitly, so we just assume fully cached or partially
+                    // Since ExoPlayer retains it, we just accept it as cached.
+                    playerCache.isCached(ptr.id, 0, 1) // Just check if anything is cached
+                }.map { it.onlineToSong() }
+                emit(completeSongs)
+            } else {
+                emit(emptyList())
+            }
+
+            delay(2000)
+        }
+    }.flowOn(Dispatchers.IO)
 
     override suspend fun deleteById(id: Long) {
         musicDao.deleteById(id)

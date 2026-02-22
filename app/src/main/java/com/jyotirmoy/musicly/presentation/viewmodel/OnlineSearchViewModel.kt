@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.jyotirmoy.musicly.data.model.OnlineContentItem
 import com.jyotirmoy.musicly.data.model.OnlineSearchResult
 import com.jyotirmoy.musicly.data.repository.YouTubeRepository
+import com.jyotirmoy.musicly.data.repository.MusicRepository
+import com.jyotirmoy.musicly.data.model.SearchHistoryItem
+import com.jyotirmoy.musicly.data.model.Genre
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -23,18 +26,20 @@ enum class OnlineSearchFilter {
 @Immutable
 data class OnlineSearchUiState(
     val query: String = "",
-    val filter: OnlineSearchFilter = OnlineSearchFilter.ALL,
+    val currentFilter: OnlineSearchFilter = OnlineSearchFilter.ALL,
     val results: List<OnlineContentItem> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
     val continuation: String? = null,
-    val searchHistory: List<String> = emptyList(),
+    val searchHistory: List<SearchHistoryItem> = emptyList(),
     val suggestions: List<String> = emptyList(),
+    val moodsAndGenres: List<Genre> = emptyList()
 )
 
 @HiltViewModel
 class OnlineSearchViewModel @Inject constructor(
     private val youTubeRepository: YouTubeRepository,
+    private val musicRepository: MusicRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(OnlineSearchUiState())
@@ -43,16 +48,73 @@ class OnlineSearchViewModel @Inject constructor(
     private var searchJob: Job? = null
 
     init {
-        // Observe search history
+        // Observe search history from unified repository
         viewModelScope.launch {
-            youTubeRepository.observeSearchHistory().collect { history ->
-                _uiState.update { it.copy(searchHistory = history) }
+            musicRepository.observeRecentSearchHistory().collect { history ->
+                _uiState.update { it.copy(searchHistory = history.take(15)) }
+            }
+        }
+        
+        // Fetch Moods & Genres for the search tab
+        viewModelScope.launch {
+            try {
+                // Try fetching explore page first as it's often more reliable/cached
+                youTubeRepository.getExplorePage().onSuccess { homePage ->
+                    val moodSection = homePage.sections.find { it.title.contains("Mood", ignoreCase = true) || it.title.contains("Genre", ignoreCase = true) }
+                    val exploreGenres = moodSection?.items?.filterIsInstance<OnlineContentItem.MoodContent>()?.map {
+                        val hexColor = try {
+                            String.format("#%06X", (0xFFFFFF and it.stripeColor.toInt()))
+                        } catch (e: Exception) {
+                            "#6200EE"
+                        }
+                        Genre(
+                            id = it.id,
+                            name = it.title,
+                            lightColorHex = hexColor,
+                            darkColorHex = hexColor,
+                            onLightColorHex = "#FFFFFF",
+                            onDarkColorHex = "#FFFFFF",
+                            thumbnailUrl = it.thumbnailUrl
+                        )
+                    } ?: emptyList()
+                    
+                        if (exploreGenres.isNotEmpty()) {
+                            _uiState.update { it.copy(moodsAndGenres = exploreGenres) }
+                        } else {
+                            // Last resort: some default genres
+                            val defaultGenres = listOf(
+                                Genre(id = "remote_chill", name = "Chill", lightColorHex = "#4CAF50", darkColorHex = "#4CAF50"),
+                                Genre(id = "remote_workout", name = "Workout", lightColorHex = "#FF5722", darkColorHex = "#FF5722"),
+                                Genre(id = "remote_focus", name = "Focus", lightColorHex = "#2196F3", darkColorHex = "#2196F3"),
+                                Genre(id = "remote_party", name = "Party", lightColorHex = "#E91E63", darkColorHex = "#E91E63"),
+                                Genre(id = "remote_romance", name = "Romance", lightColorHex = "#F44336", darkColorHex = "#F44336"),
+                                Genre(id = "remote_sleep", name = "Sleep", lightColorHex = "#9C27B0", darkColorHex = "#9C27B0"),
+                                Genre(id = "remote_energetic", name = "Energetic", lightColorHex = "#FFC107", darkColorHex = "#FFC107"),
+                                Genre(id = "remote_relax", name = "Relax", lightColorHex = "#00BCD4", darkColorHex = "#00BCD4"),
+                                Genre(id = "remote_commute", name = "Commute", lightColorHex = "#607D8B", darkColorHex = "#607D8B")
+                            )
+                            _uiState.update { it.copy(moodsAndGenres = defaultGenres) }
+                        }
+
+                }
+                
+                // Then try the dedicated mood & genres call to get even more items
+                youTubeRepository.getMoodAndGenres().onSuccess { mappedGenres ->
+                    if (mappedGenres.isNotEmpty()) {
+                        _uiState.update { state ->
+                            val combined = (state.moodsAndGenres + mappedGenres).distinctBy { it.id }
+                            state.copy(moodsAndGenres = combined)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
 
     fun updateFilter(filter: OnlineSearchFilter) {
-        _uiState.update { it.copy(filter = filter) }
+        _uiState.update { it.copy(currentFilter = filter) }
         if (_uiState.value.query.isNotBlank()) {
             performSearch(_uiState.value.query)
         }
@@ -71,7 +133,8 @@ class OnlineSearchViewModel @Inject constructor(
             delay(350) // debounce
             _uiState.update { it.copy(isLoading = true, error = null) }
 
-            val result = when (_uiState.value.filter) {
+            val filter = _uiState.value.currentFilter
+            val result = when (filter) {
                 OnlineSearchFilter.ALL -> youTubeRepository.searchSongs(query)
                 OnlineSearchFilter.SONGS -> youTubeRepository.searchSongs(query)
                 OnlineSearchFilter.ALBUMS -> youTubeRepository.searchAlbums(query)
@@ -128,8 +191,14 @@ class OnlineSearchViewModel @Inject constructor(
     fun onSearchSubmitted(query: String) {
         if (query.isNotBlank()) {
             viewModelScope.launch {
-                youTubeRepository.saveSearchQuery(query)
+                musicRepository.addSearchHistoryItem(query)
             }
+        }
+    }
+
+    fun onSearchItemClicked(item: SearchHistoryItem) {
+        viewModelScope.launch {
+            musicRepository.addSearchHistoryItemObj(item)
         }
     }
 
@@ -154,13 +223,13 @@ class OnlineSearchViewModel @Inject constructor(
 
     fun deleteSearchHistoryItem(query: String) {
         viewModelScope.launch {
-            youTubeRepository.deleteSearchQuery(query)
+            musicRepository.deleteSearchHistoryItemByQuery(query)
         }
     }
 
     fun clearSearchHistory() {
         viewModelScope.launch {
-            youTubeRepository.clearSearchHistory()
+            musicRepository.clearSearchHistory()
         }
     }
 }

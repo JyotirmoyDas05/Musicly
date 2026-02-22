@@ -10,5 +10,6 @@ data class Genre(
     val lightColorHex: String? = null,
     val onLightColorHex: String? = null,
     val darkColorHex: String? = null,
-    val onDarkColorHex: String? = null
+    val onDarkColorHex: String? = null,
+    val thumbnailUrl: String? = null
 )

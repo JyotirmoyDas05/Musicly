@@ -296,6 +296,18 @@ interface MusicDao {
         applyDirectoryFilter: Boolean
     ): List<SongEntity>
 
+    @Query("""
+        SELECT songs.* FROM songs
+        INNER JOIN favorites ON songs.id = favorites.songId AND favorites.isFavorite = 1
+        WHERE (:applyDirectoryFilter = 0 OR songs.parent_directory_path IN (:allowedParentDirs))
+        ORDER BY songs.title ASC
+    """)
+    fun getFavoriteSongsListFlow(
+        allowedParentDirs: List<String>,
+        applyDirectoryFilter: Boolean
+    ): Flow<List<SongEntity>>
+
+
     /**
      * Returns the count of favorite songs (reactive).
      */

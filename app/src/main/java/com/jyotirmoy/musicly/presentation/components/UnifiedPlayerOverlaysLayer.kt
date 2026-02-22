@@ -164,9 +164,13 @@ internal fun UnifiedPlayerSongInfoLayer(
         }.collectAsState(initial = staticSong)
 
         val liveSong = liveSongState
-        val isOnline = remember(liveSong.contentUriString) {
-            liveSong.contentUriString.startsWith("https://music.youtube.com")
-        }
+        val isOnline = liveSong.isOnline
+
+        val downloads by playerViewModel.downloads.collectAsState()
+        val downloadState = downloads[liveSong.id]
+        val downloadProgress = downloadState?.percentDownloaded?.div(100f)
+        val isDownloading = downloadState?.state == androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING
+        val isOnlineSongDownloaded = downloadState?.state == androidx.media3.exoplayer.offline.Download.STATE_COMPLETED
 
         MaterialTheme(
             colorScheme = albumColorScheme,
@@ -208,8 +212,21 @@ internal fun UnifiedPlayerSongInfoLayer(
                         onDismissSongInfo()
                     },
                     onDownload = {
-                        // TODO: Implement Download
-                        Toast.makeText(context, "Download not implemented yet", Toast.LENGTH_SHORT).show()
+                        if (!isDownloading) {
+                            playerViewModel.downloadOnlineSong(
+                                songId = liveSong.id,
+                                title = liveSong.title,
+                                artist = liveSong.displayArtist,
+                                album = liveSong.album,
+                                thumbnailUrl = liveSong.albumArtUriString
+                            )
+                        }
+                    },
+                    isDownloaded = isOnlineSongDownloaded,
+                    isDownloading = isDownloading,
+                    downloadProgress = downloadProgress,
+                    onDeleteDownloaded = {
+                        playerViewModel.deleteDownloadedOnlineSong(liveSong.id, liveSong.title)
                         onDismissSongInfo()
                     },
                     onRemoveFromQueue = {

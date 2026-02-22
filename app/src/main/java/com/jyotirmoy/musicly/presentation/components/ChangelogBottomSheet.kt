@@ -61,6 +61,38 @@ data class ChangelogVersion(
 // The changelog data
 val changelog = listOf(
     ChangelogVersion(
+        version = "0.9.0-beta",
+        date = "2026-02-22",
+        sections = listOf(
+            ChangelogSection(
+                title = "Highlights",
+                items = listOf(
+                    "Complete Offline Integration: Downloaded and Cached songs now work seamlessly",
+                    "Integrated 4-Folder Library Grid for quick access to collections",
+                    "Full Parity for Liked and Cached folders with Metrolist"
+                )
+            ),
+            ChangelogSection(
+                title = "Improvements",
+                items = listOf(
+                    "Improved Cached songs detection: Now verifies actual playback cache state",
+                    "Unified Liked library: Combined local and online liked songs into a single view",
+                    "Enhanced download reliability: Ensures song metadata is registered before download starts",
+                    "Always visible folder grid on Playlists tab, even with empty playlists"
+                )
+            ),
+            ChangelogSection(
+                title = "Fixes",
+                items = listOf(
+                    "Fixed visibility of downloaded online songs in library",
+                    "Fixed grid visibility on empty playlist states",
+                    "Resolved Dagger Hilt binding errors for ExoPlayer caches",
+                    "Fixed various syntax and compile errors in repository logic"
+                )
+            )
+        )
+    ),
+    ChangelogVersion(
         version = "0.8.0-beta",
         date = "2026-02-20",
         sections = listOf(

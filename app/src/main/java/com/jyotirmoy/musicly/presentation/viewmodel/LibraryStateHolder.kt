@@ -90,6 +90,12 @@ class LibraryStateHolder @Inject constructor(
 
     val favoriteSongCountFlow: kotlinx.coroutines.flow.Flow<Int> = musicRepository.getFavoriteSongCountFlow()
 
+    val downloadedSongs: kotlinx.coroutines.flow.Flow<List<Song>> = musicRepository.getDownloadedSongs()
+        .flowOn(Dispatchers.IO)
+
+    val cachedSongs: kotlinx.coroutines.flow.Flow<List<Song>> = musicRepository.getCachedSongs()
+        .flowOn(Dispatchers.IO)
+
     @OptIn(ExperimentalStdlibApi::class)
     val genres: kotlinx.coroutines.flow.Flow<ImmutableList<com.jyotirmoy.musicly.data.model.Genre>> = _allSongs
         .map { songs ->

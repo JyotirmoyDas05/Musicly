@@ -13,6 +13,7 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/> <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
@@ -98,6 +99,12 @@
                 <category android:name="android.intent.category.APP_MUSIC" />
             </intent-filter>
         </service>
+
+        <service
+            android:name=".data.service.ExoDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
 
         <meta-data
             android:name="com.google.android.gms.car.application"

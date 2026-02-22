@@ -285,12 +285,23 @@ fun SongInfoBottomSheet(
                                                 .fillMaxHeight(),
                                             onClick = {
                                                 try {
-                                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                        type = "audio/*"
-                                                        putExtra(Intent.EXTRA_STREAM, song.contentUriString.toUri())
-                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    if (song.isOnline) {
+                                                        // Share YT Music link
+                                                        val ytLink = "https://music.youtube.com/watch?v=${song.id}"
+                                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                            type = "text/plain"
+                                                            putExtra(Intent.EXTRA_TEXT, ytLink)
+                                                            putExtra(Intent.EXTRA_SUBJECT, song.title)
+                                                        }
+                                                        context.startActivity(Intent.createChooser(shareIntent, "Share Song Link"))
+                                                    } else {
+                                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                            type = "audio/*"
+                                                            putExtra(Intent.EXTRA_STREAM, song.contentUriString.toUri())
+                                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                        }
+                                                        context.startActivity(Intent.createChooser(shareIntent, "Share Song File Via"))
                                                     }
-                                                    context.startActivity(Intent.createChooser(shareIntent, "Share Song File Via"))
                                                 } catch (e: Exception) {
                                                     Toast.makeText(context, "Could not share song: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
                                                 }

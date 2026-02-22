@@ -322,70 +322,109 @@ class LyricsRepositoryImpl @Inject constructor(
         updateLastApiCall("lrclib", System.currentTimeMillis())
 
         try {
-            val cleanArtist = song.displayArtist.trim().replace(Regex("\\(.*?\\)"), "").trim()
-            val cleanTitle = song.title.trim().replace(Regex("\\(.*?\\)"), "").trim()
-            val simplifiedArtist = cleanArtist.split(" feat.", " ft.", " featuring").first().trim()
-            val simplifiedTitle = cleanTitle.split(" feat.", " ft.", " featuring").first().trim()
-            val useSimplifiedStrategy =
-                simplifiedArtist != cleanArtist || simplifiedTitle != cleanTitle
+            val cleanArtist = com.jyotirmoy.musicly.data.network.lyrics.LyricsCleaner.cleanArtist(song.displayArtist)
+            val cleanTitle = com.jyotirmoy.musicly.data.network.lyrics.LyricsCleaner.cleanTitle(song.title)
 
-            val searchStrategies = buildList {
-                add(
-                    RemoteSearchStrategy("track+artist") {
-                        lrcLibApiService.searchLyrics(trackName = cleanTitle, artistName = cleanArtist)
-                    }
-                )
-                add(
-                    RemoteSearchStrategy("combined_query") {
-                        lrcLibApiService.searchLyrics(query = "$cleanArtist $cleanTitle")
-                    }
-                )
-                if (useSimplifiedStrategy) {
-                    add(
-                        RemoteSearchStrategy("simplified_track+artist") {
-                            lrcLibApiService.searchLyrics(trackName = simplifiedTitle, artistName = simplifiedArtist)
-                        }
-                    )
-                }
-            }
-
-            val results = runSearchStrategiesFast(searchStrategies)
-            if (results.isEmpty()) {
-                Log.d(TAG, "No results from LRCLIB API")
+            if (cleanTitle.isBlank() || cleanArtist.isBlank()) {
                 return@withContext null
             }
 
-            // Find best match - prioritize exact matches, then synced lyrics (matching Rhythm)
-            val songDurationSeconds = song.duration / 1000
-            val bestMatch = results.firstOrNull { result ->
-                val artistMatch = result.artistName.lowercase().contains(cleanArtist.lowercase()) ||
-                        cleanArtist.lowercase().contains(result.artistName.lowercase())
-                val titleMatch = result.name.lowercase().contains(cleanTitle.lowercase()) ||
-                        cleanTitle.lowercase().contains(result.name.lowercase())
-                val durationDiff = abs(result.duration - songDurationSeconds)
-
-                (artistMatch && titleMatch) && durationDiff <= 15 && hasLyrics(result)
-            } ?: results.firstOrNull { hasSyncedLyrics(it) && abs(it.duration - songDurationSeconds) <= 15 }
-            ?: results.firstOrNull { hasLyrics(it) && abs(it.duration - songDurationSeconds) <= 15 }
-
-            if (bestMatch != null) {
-                val rawLyrics = bestMatch.syncedLyrics ?: bestMatch.plainLyrics
+            // 1. Try specialized SimpMusic provider for online songs (exact video ID match)
+            val songDurationSeconds = (song.duration / 1000).toInt()
+            val simpLyrics = com.jyotirmoy.musicly.data.network.lyrics.providers.SimpMusicLyrics.getLyrics(song.id, songDurationSeconds).getOrNull()
+            if (simpLyrics != null) {
+                val rawLyrics = simpLyrics.richSyncLyrics ?: simpLyrics.syncedLyrics ?: simpLyrics.plainLyric
                 if (!rawLyrics.isNullOrBlank()) {
-                    val parsedLyrics = LyricsUtils.parseLyrics(rawLyrics).copy(areFromRemote = true)
+                    val parsed = LyricsUtils.parseLyrics(rawLyrics).copy(areFromRemote = true)
+                    if (parsed.isValid()) {
+                        lyricsDao.insert(
+                            com.jyotirmoy.musicly.data.database.LyricsEntity(
+                                songId = song.id.toLongOrNull() ?: song.id.hashCode().toLong(),
+                                content = rawLyrics,
+                                isSynced = !simpLyrics.syncedLyrics.isNullOrEmpty() || !simpLyrics.richSyncLyrics.isNullOrEmpty(),
+                                source = "SimpMusic"
+                            )
+                        )
+                        return@withContext parsed
+                    }
+                }
+            }
+
+            // 2. Try exact match on LRCLIB (best quality for catalog tracks)
+            if (songDurationSeconds > 0) {
+                val response = try {
+                    lrcLibApiService.getLyrics(
+                        trackName = cleanTitle,
+                        artistName = cleanArtist,
+                        albumName = song.album.takeIf { it.isNotBlank() },
+                        duration = songDurationSeconds
+                    )
+                } catch (e: Exception) {
+                    null
+                }
+
+                if (response != null && (!response.syncedLyrics.isNullOrEmpty() || !response.plainLyrics.isNullOrEmpty())) {
+                    val rawLyricsToSave = response.syncedLyrics ?: response.plainLyrics!!
+                    val parsedLyrics = LyricsUtils.parseLyrics(rawLyricsToSave).copy(areFromRemote = true)
                     if (parsedLyrics.isValid()) {
-                        Log.d(TAG, "LRCLIB lyrics found - Synced: ${!bestMatch.syncedLyrics.isNullOrBlank()}, Plain: ${!bestMatch.plainLyrics.isNullOrBlank()}")
-                        
                         // Save to database
                         lyricsDao.insert(
                             com.jyotirmoy.musicly.data.database.LyricsEntity(
-                                songId = song.id.toLong(),
-                                content = rawLyrics,
-                                isSynced = !bestMatch.syncedLyrics.isNullOrBlank(),
-                                source = "remote"
+                                songId = song.id.toLongOrNull() ?: song.id.hashCode().toLong(),
+                                content = rawLyricsToSave,
+                                isSynced = !response.syncedLyrics.isNullOrEmpty(),
+                                source = "LRCLIB"
                             )
                         )
-                        
                         return@withContext parsedLyrics
+                    }
+                }
+            }
+
+            // 3. Multi-strategy search (same approach as searchRemote)
+            val strategies = listOf(
+                RemoteSearchStrategy("track+artist") {
+                    lrcLibApiService.searchLyrics(trackName = cleanTitle, artistName = cleanArtist)
+                },
+                RemoteSearchStrategy("combined_query") {
+                    lrcLibApiService.searchLyrics(query = "$cleanArtist $cleanTitle")
+                },
+                RemoteSearchStrategy("track_only") {
+                    lrcLibApiService.searchLyrics(trackName = cleanTitle)
+                },
+                RemoteSearchStrategy("query_title_only") {
+                    lrcLibApiService.searchLyrics(query = cleanTitle)
+                }
+            )
+
+            val searchResults = runSearchStrategiesFast(strategies)
+
+            if (searchResults.isNotEmpty()) {
+                val durSec = song.duration / 1000
+                // Pick best: synced first, close duration, skip filter if duration unknown
+                val bestMatch = searchResults
+                    .filter { !it.syncedLyrics.isNullOrBlank() || !it.plainLyrics.isNullOrBlank() }
+                    .sortedWith(
+                        compareByDescending<LrcLibResponse> { !it.syncedLyrics.isNullOrBlank() }
+                            .thenBy { abs(it.duration - durSec) }
+                    )
+                    .firstOrNull { durSec <= 0 || abs(it.duration - durSec) <= 30 }
+
+                if (bestMatch != null) {
+                    val rawLyrics = bestMatch.syncedLyrics ?: bestMatch.plainLyrics
+                    if (!rawLyrics.isNullOrBlank()) {
+                        val parsedLyrics = LyricsUtils.parseLyrics(rawLyrics).copy(areFromRemote = true)
+                        if (parsedLyrics.isValid()) {
+                            lyricsDao.insert(
+                                com.jyotirmoy.musicly.data.database.LyricsEntity(
+                                    songId = song.id.toLongOrNull() ?: song.id.hashCode().toLong(),
+                                    content = rawLyrics,
+                                    isSynced = !bestMatch.syncedLyrics.isNullOrEmpty(),
+                                    source = "LRCLIB"
+                                )
+                            )
+                            return@withContext parsedLyrics
+                        }
                     }
                 }
             }
@@ -395,6 +434,7 @@ class LyricsRepositoryImpl @Inject constructor(
             Log.e(TAG, "LRCLIB lyrics fetch failed: ${e.message}", e)
             return@withContext null
         }
+
     }
 
     private fun hasLyrics(response: LrcLibResponse): Boolean =
@@ -515,7 +555,7 @@ class LyricsRepositoryImpl @Inject constructor(
      */
     private suspend fun loadLyricsFromStorage(song: Song): Lyrics? = withContext(Dispatchers.IO) {
         // First check database for persisted lyrics (was user-imported or cached)
-        val persisted = lyricsDao.getLyrics(song.id.toLong())
+        val persisted = lyricsDao.getLyrics(song.id.toLongOrNull() ?: song.id.hashCode().toLong())
         if (persisted != null && !persisted.content.isBlank()) {
             val parsedLyrics = LyricsUtils.parseLyrics(persisted.content)
             if (parsedLyrics.isValid()) {
@@ -580,7 +620,7 @@ class LyricsRepositoryImpl @Inject constructor(
 
                     lyricsDao.insert(
                          com.jyotirmoy.musicly.data.database.LyricsEntity(
-                             songId = song.id.toLong(),
+                             songId = song.id.toLongOrNull() ?: song.id.hashCode().toLong(),
                              content = rawLyricsToSave,
                              isSynced = !best.lyrics.synced.isNullOrEmpty(),
                              source = "remote"
@@ -597,42 +637,49 @@ class LyricsRepositoryImpl @Inject constructor(
                 }
             }
 
-            // Fallback: Try the exact match API (less likely to succeed, but worth a shot)
-            val response = lrcLibApiService.getLyrics(
-                trackName = song.title,
-                artistName = song.displayArtist,
-                albumName = song.album,
-                duration = (song.duration / 1000).toInt()
-            )
-
-            if (response != null && (!response.syncedLyrics.isNullOrEmpty() || !response.plainLyrics.isNullOrEmpty())) {
-                val rawLyricsToSave = response.syncedLyrics ?: response.plainLyrics!!
-
-                val parsedLyrics = LyricsUtils.parseLyrics(rawLyricsToSave).copy(areFromRemote = true)
-                if (!parsedLyrics.isValid()) {
-                    return@withContext Result.failure(LyricsException("Parsed lyrics are empty"))
-                }
-
-                lyricsDao.insert(
-                     com.jyotirmoy.musicly.data.database.LyricsEntity(
-                         songId = song.id.toLong(),
-                         content = rawLyricsToSave,
-                         isSynced = !parsedLyrics.synced.isNullOrEmpty(),
-                         source = "remote"
-                     )
+            // Fallback: Try the exact match API with cleaned metadata
+            val fallbackTitle = com.jyotirmoy.musicly.data.network.lyrics.LyricsCleaner.cleanTitle(song.title)
+            val fallbackArtist = com.jyotirmoy.musicly.data.network.lyrics.LyricsCleaner.cleanArtist(song.displayArtist)
+            val durationSeconds = (song.duration / 1000).toInt()
+            if (durationSeconds >= 1 && durationSeconds <= 3600) {
+                val response = lrcLibApiService.getLyrics(
+                    trackName = fallbackTitle,
+                    artistName = fallbackArtist,
+                    albumName = song.album,
+                    duration = durationSeconds
                 )
 
-                val cacheKey = generateCacheKey(song.id)
-                synchronized(lyricsCache) {
-                    lyricsCache[cacheKey] = parsedLyrics
-                }
-                LogUtils.d(this@LyricsRepositoryImpl, "Fetched and cached remote lyrics (exact match) for: ${song.title}")
+                if (response != null && (!response.syncedLyrics.isNullOrEmpty() || !response.plainLyrics.isNullOrEmpty())) {
+                    val rawLyricsToSave = response.syncedLyrics ?: response.plainLyrics!!
 
-                Result.success(Pair(parsedLyrics, rawLyricsToSave))
+                    val parsedLyrics = LyricsUtils.parseLyrics(rawLyricsToSave).copy(areFromRemote = true)
+                    if (!parsedLyrics.isValid()) {
+                        return@withContext Result.failure(LyricsException("Parsed lyrics are empty"))
+                    }
+
+                    lyricsDao.insert(
+                         com.jyotirmoy.musicly.data.database.LyricsEntity(
+                             songId = song.id.toLongOrNull() ?: song.id.hashCode().toLong(),
+                             content = rawLyricsToSave,
+                             isSynced = !parsedLyrics.synced.isNullOrEmpty(),
+                             source = "remote"
+                         )
+                    )
+
+                    val cacheKey = generateCacheKey(song.id)
+                    synchronized(lyricsCache) {
+                        lyricsCache[cacheKey] = parsedLyrics
+                    }
+                    LogUtils.d(this@LyricsRepositoryImpl, "Fetched and cached remote lyrics (exact match) for: ${song.title}")
+
+                    return@withContext Result.success(Pair(parsedLyrics, rawLyricsToSave))
+                }
             } else {
-                LogUtils.d(this@LyricsRepositoryImpl, "No lyrics found remotely for: ${song.title}")
-                Result.failure(NoLyricsFoundException())
+                LogUtils.d(this@LyricsRepositoryImpl, "Skipping exact match API (invalid duration: ${durationSeconds}s)")
             }
+
+            LogUtils.d(this@LyricsRepositoryImpl, "No lyrics found remotely for: ${song.title}")
+            Result.failure(NoLyricsFoundException())
         } catch (e: Exception) {
             LogUtils.e(this@LyricsRepositoryImpl, e, "Error fetching lyrics from remote")
             when {
@@ -652,16 +699,19 @@ class LyricsRepositoryImpl @Inject constructor(
             LogUtils.d(this@LyricsRepositoryImpl, "Searching remote for lyrics for: ${song.title} by ${song.displayArtist}")
 
             val combinedQuery = "${song.title} ${song.displayArtist}"
-            val cleanTitle = song.title.trim()
-            val cleanArtist = song.displayArtist.trim()
+            // Clean metadata before searching (strips "- Topic", "VEVO", etc.)
+            val cleanTitle = com.jyotirmoy.musicly.data.network.lyrics.LyricsCleaner.cleanTitle(song.title)
+            val cleanArtist = com.jyotirmoy.musicly.data.network.lyrics.LyricsCleaner.cleanArtist(song.displayArtist)
+
+            LogUtils.d(this@LyricsRepositoryImpl, "Cleaned metadata: title='$cleanTitle', artist='$cleanArtist' (raw='${song.displayArtist}')")
 
             // FAST STRATEGY: run all requests in parallel, keep first non-empty batch
             val strategies = listOf(
-                RemoteSearchStrategy("query+artist") {
-                    lrcLibApiService.searchLyrics(query = combinedQuery, artistName = cleanArtist)
-                },
                 RemoteSearchStrategy("track+artist") {
                     lrcLibApiService.searchLyrics(trackName = cleanTitle, artistName = cleanArtist)
+                },
+                RemoteSearchStrategy("combined_query") {
+                    lrcLibApiService.searchLyrics(query = "$cleanArtist $cleanTitle")
                 },
                 RemoteSearchStrategy("track_only") {
                     lrcLibApiService.searchLyrics(trackName = cleanTitle)
@@ -675,11 +725,15 @@ class LyricsRepositoryImpl @Inject constructor(
 
             if (uniqueResults.isNotEmpty()) {
                 val songDurationSeconds = song.duration / 1000
+                LogUtils.d(this@LyricsRepositoryImpl, "Song duration: ${song.duration}ms (${songDurationSeconds}s), filtering ${uniqueResults.size} results")
                 val results = uniqueResults.mapNotNull { response ->
-                    val durationDiff = abs(response.duration - songDurationSeconds)
-                    if (durationDiff > 15) {
-                        LogUtils.d(this@LyricsRepositoryImpl, "  Skipping '${response.name}' - duration mismatch: ${response.duration}s vs ${songDurationSeconds}s (diff: ${durationDiff}s)")
-                        return@mapNotNull null
+                    // Skip duration filter if song duration is unknown (online songs)
+                    if (songDurationSeconds > 0) {
+                        val durationDiff = abs(response.duration - songDurationSeconds)
+                        if (durationDiff > 30) {
+                            LogUtils.d(this@LyricsRepositoryImpl, "  Skipping '${response.name}' - duration mismatch: ${response.duration}s vs ${songDurationSeconds}s (diff: ${durationDiff}s)")
+                            return@mapNotNull null
+                        }
                     }
 
                     val rawLyrics = response.syncedLyrics ?: response.plainLyrics ?: return@mapNotNull null
@@ -692,7 +746,12 @@ class LyricsRepositoryImpl @Inject constructor(
                     LogUtils.d(this@LyricsRepositoryImpl, "  Found: ${response.name} by ${response.artistName} (synced: $hasSynced)")
                     LyricsSearchResult(response, parsedLyrics, rawLyrics)
                 }
-                    .sortedByDescending { !it.record.syncedLyrics.isNullOrEmpty() }
+                    // Sort: synced first, then best duration match, artist match as tiebreaker
+                    .sortedWith(
+                        compareByDescending<LyricsSearchResult> { !it.record.syncedLyrics.isNullOrEmpty() }
+                            .thenBy { abs(it.record.duration - songDurationSeconds) }
+                            .thenByDescending { com.jyotirmoy.musicly.data.network.lyrics.LyricsCleaner.artistFuzzyMatch(cleanArtist, it.record.artistName ?: "") }
+                    )
 
                 if (results.isNotEmpty()) {
                     val syncedCount = results.count { !it.record.syncedLyrics.isNullOrEmpty() }
@@ -889,7 +948,7 @@ class LyricsRepositoryImpl @Inject constructor(
                                     if (LyricsUtils.parseLyrics(content).isValid()) {
                                         lyricsDao.insert(
                                              com.jyotirmoy.musicly.data.database.LyricsEntity(
-                                                 songId = song.id.toLong(),
+                                                 songId = song.id.toLongOrNull() ?: song.id.hashCode().toLong(),
                                                  content = content,
                                                  isSynced = LyricsUtils.parseLyrics(content).synced?.isNotEmpty() == true,
                                                  source = "local_file"

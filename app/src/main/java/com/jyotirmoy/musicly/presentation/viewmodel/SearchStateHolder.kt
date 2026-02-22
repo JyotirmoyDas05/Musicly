@@ -48,6 +48,15 @@ class SearchStateHolder @Inject constructor(
      */
     fun initialize(scope: CoroutineScope) {
         this.scope = scope
+        observeSearchHistory()
+    }
+
+    private fun observeSearchHistory() {
+        scope?.launch {
+            musicRepository.observeRecentSearchHistory().collect { history ->
+                _searchHistory.value = history.take(20).toImmutableList()
+            }
+        }
     }
 
     fun updateSearchFilter(filterType: SearchFilterType) {
@@ -55,16 +64,7 @@ class SearchStateHolder @Inject constructor(
     }
 
     fun loadSearchHistory(limit: Int = 15) {
-        scope?.launch {
-            try {
-                val history = withContext(Dispatchers.IO) {
-                    musicRepository.getRecentSearchHistory(limit)
-                }
-                _searchHistory.value = history.toImmutableList()
-            } catch (e: Exception) {
-                Log.e("SearchStateHolder", "Error loading search history", e)
-            }
-        }
+        // No-op since we are observing
     }
 
     fun onSearchQuerySubmitted(query: String) {
@@ -74,10 +74,21 @@ class SearchStateHolder @Inject constructor(
                     withContext(Dispatchers.IO) {
                         musicRepository.addSearchHistoryItem(query)
                     }
-                    loadSearchHistory()
                 } catch (e: Exception) {
                     Log.e("SearchStateHolder", "Error adding search history item", e)
                 }
+            }
+        }
+    }
+
+    fun onSearchItemClicked(item: SearchHistoryItem) {
+        scope?.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    musicRepository.addSearchHistoryItemObj(item)
+                }
+            } catch (e: Exception) {
+                Log.e("SearchStateHolder", "Error adding search history item", e)
             }
         }
     }
@@ -110,7 +121,6 @@ class SearchStateHolder @Inject constructor(
                 withContext(Dispatchers.IO) {
                     musicRepository.deleteSearchHistoryItemByQuery(query)
                 }
-                loadSearchHistory()
             } catch (e: Exception) {
                 Log.e("SearchStateHolder", "Error deleting search history item", e)
             }

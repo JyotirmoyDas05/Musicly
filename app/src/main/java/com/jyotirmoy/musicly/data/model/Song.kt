@@ -34,6 +34,8 @@ data class Song(
     val bitrate: Int?,
     val sampleRate: Int?,
 ) {
+    /** True when this is a streaming/online song with no local file. */
+    val isOnline: Boolean get() = path.isBlank()
     private val defaultArtistDelimiters = listOf("/", ";", ",", "+", "&")
 
     /**

@@ -69,7 +69,7 @@ fun BetaInfoBottomSheet(modifier: Modifier = Modifier) {
             item(key = "header") {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Beta 0.8.0",
+                        text = "Beta 0.9.0",
                         fontFamily = GoogleSansRounded,
                         style = ExpTitleTypography.displaySmall,
                         color = MaterialTheme.colorScheme.onSurface
@@ -139,12 +139,12 @@ fun BetaInfoBottomSheet(modifier: Modifier = Modifier) {
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(
-                                text = "Welcome to the 0.8.0 beta!",
+                                text = "Welcome to the 0.9.0 beta!",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "This update brings automatic update checking with direct APK downloads and installation.",
+                                text = "This update brings full parity for Liked and Cached folders, ensuring a seamless offline experience.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -159,12 +159,12 @@ fun BetaInfoBottomSheet(modifier: Modifier = Modifier) {
                     shape = AbsoluteSmoothCornerShape(
                         cornerRadiusTR = fabCornerRadius,
                         cornerRadiusTL = fabCornerRadius,
-                        cornerRadiusBL = fabCornerRadius,
                         cornerRadiusBR = fabCornerRadius,
+                        cornerRadiusBL = fabCornerRadius,
                         smoothnessAsPercentTR = 60,
                         smoothnessAsPercentTL = 60,
-                        smoothnessAsPercentBL = 60,
-                        smoothnessAsPercentBR = 60
+                        smoothnessAsPercentBR = 60,
+                        smoothnessAsPercentBL = 60
                     ),
                     tonalElevation = 2.dp,
                     color = MaterialTheme.colorScheme.surfaceContainerLow
@@ -189,33 +189,34 @@ fun BetaInfoBottomSheet(modifier: Modifier = Modifier) {
                             )
                         }
                         Text(
-                            text = "Automatic update checker that monitors GitHub releases for new versions.",
+                            text = "A merged 'Liked Songs' collection that brings together your local favorites and online liked tracks in one place.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Direct APK downloads with intelligent device architecture detection (arm64-v8a, armeabi-v7a, x86_64).",
+                            text = "Accurate 'Cached Songs' tracking that monitors ExoPlayer's playback cache in real-time.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Seamless APK installation with proper permission handling for unknown app sources.",
+                            text = "Robust offline song visibility ensuring every download is properly registered in your library.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Update button in the home screen top bar that appears only when a new version is available.",
+                            text = "Consolidated 4-folder Quick Access grid available even when no custom playlists are created.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Release notes display with download progress tracking and visual feedback.",
+                            text = "Automatic device architecture detection for downloading the most optimized APK for your phone.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
+
 
             item(key = "report-issue") {
                 Surface(

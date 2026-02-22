@@ -56,8 +56,10 @@ import com.jyotirmoy.musicly.presentation.screens.SettingsCategoryScreen
 import com.jyotirmoy.musicly.presentation.screens.EqualizerScreen
 import com.jyotirmoy.musicly.presentation.viewmodel.PlayerViewModel
 import com.jyotirmoy.musicly.presentation.viewmodel.PlaylistViewModel
-import kotlinx.coroutines.flow.first
+import com.jyotirmoy.musicly.presentation.screens.LibraryOfflineScreen
+import com.jyotirmoy.musicly.presentation.viewmodel.LibraryViewModel
 import com.jyotirmoy.musicly.presentation.components.ScreenWrapper
+import kotlinx.coroutines.flow.first
 
 @OptIn(UnstableApi::class)
 @SuppressLint("UnrememberedGetBackStackEntry")
@@ -560,6 +562,42 @@ fun AppNavigation(
                     OnlinePlaylistScreen(
                         navController = navController,
                         playerViewModel = playerViewModel,
+                    )
+                }
+            }
+            composable(
+                Screen.DownloadedSongs.route,
+                enterTransition = { enterTransition() },
+                exitTransition = { exitTransition() },
+                popEnterTransition = { popEnterTransition() },
+                popExitTransition = { popExitTransition() },
+            ) {
+                val libraryViewModel: LibraryViewModel = hiltViewModel<LibraryViewModel>()
+                ScreenWrapper(navController = navController) {
+                    LibraryOfflineScreen(
+                        navController = navController,
+                        title = "Downloaded Songs",
+                        songsFlow = libraryViewModel.downloadedSongs,
+                        playerViewModel = playerViewModel,
+                        libraryViewModel = libraryViewModel
+                    )
+                }
+            }
+            composable(
+                Screen.CachedSongs.route,
+                enterTransition = { enterTransition() },
+                exitTransition = { exitTransition() },
+                popEnterTransition = { popEnterTransition() },
+                popExitTransition = { popExitTransition() },
+            ) {
+                val libraryViewModel: LibraryViewModel = hiltViewModel<LibraryViewModel>()
+                ScreenWrapper(navController = navController) {
+                    LibraryOfflineScreen(
+                        navController = navController,
+                        title = "Cached Songs",
+                        songsFlow = libraryViewModel.cachedSongs,
+                        playerViewModel = playerViewModel,
+                        libraryViewModel = libraryViewModel
                     )
                 }
             }

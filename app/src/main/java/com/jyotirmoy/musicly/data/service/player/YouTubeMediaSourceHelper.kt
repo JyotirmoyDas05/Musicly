@@ -120,6 +120,12 @@ class YouTubeMediaSourceHelper @Inject constructor(
     }
 
     /**
+     * Creates a [DataSource.Factory] for use by ExoPlayer's [DownloadManager].
+     * This wraps downloads via the same cache layers as streaming.
+     */
+    fun createDataSourceFactory(): DataSource.Factory = createCacheDataSourceFactory()
+
+    /**
      * Creates a [DataSource.Factory] that falls through to default behavior for local URIs.
      * This allows the same ExoPlayer to handle both local songs and YouTube streams.
      */

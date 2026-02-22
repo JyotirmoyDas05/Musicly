@@ -550,11 +550,9 @@ fun FullPlayerContent(
                 showQueueButton = isLandscape,
                 onClickQueue = onShowQueueClicked,
                 onClickSongInfo = {
-                    // Always try to show options, differentiating by content type
-                    if (song.contentUriString.startsWith("https://music.youtube.com")) {
+                    if (song.isOnline) {
                         showOnlineSongOptions = true
                     } else {
-                        // For local songs, show info sheet
                         showSongInfoBottomSheet = true
                     }
                 },
@@ -888,7 +886,7 @@ fun FullPlayerContent(
                                     )
                                     .background(playerOnAccentColor.copy(alpha = 0.7f))
                                     .clickable {
-                                        if (song.contentUriString.startsWith("https://music.youtube.com")) {
+                                        if (song.isOnline) {
                                             showOnlineSongOptions = true
                                         } else {
                                             showSongInfoBottomSheet = true
@@ -1013,11 +1011,17 @@ fun FullPlayerContent(
                 playerViewModel.generateAiMetadata(song, fields)
             },
             removeFromListTrigger = {
-                 playerViewModel.removeSongFromQueue(song.id)
-                 showSongInfoBottomSheet = false
+                playerViewModel.removeSongFromQueue(song.id)
+                showSongInfoBottomSheet = false
             }
         )
     }
+
+    val downloads by playerViewModel.downloads.collectAsState()
+    val downloadState = if (song.isOnline) downloads[song.id] else null
+    val downloadProgress = downloadState?.percentDownloaded?.div(100f)
+    val isDownloading = downloadState?.state == androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING
+    val isOnlineSongDownloaded = downloadState?.state == androidx.media3.exoplayer.offline.Download.STATE_COMPLETED
 
     if (showOnlineSongOptions) {
         val metadata = song.toMediaMetadata()
@@ -1051,8 +1055,21 @@ fun FullPlayerContent(
                 showOnlineSongOptions = false
             },
             onDownload = {
-                // TODO: Implement Download for Online Songs
-                Toast.makeText(context, "Download not implemented yet", Toast.LENGTH_SHORT).show()
+                if (!isDownloading) {
+                    playerViewModel.downloadOnlineSong(
+                        songId = song.id,
+                        title = song.title,
+                        artist = song.displayArtist,
+                        album = song.album,
+                        thumbnailUrl = song.albumArtUriString
+                    )
+                }
+            },
+            isDownloaded = isOnlineSongDownloaded,
+            isDownloading = isDownloading,
+            downloadProgress = downloadProgress,
+            onDeleteDownloaded = {
+                playerViewModel.deleteDownloadedOnlineSong(song.id, song.title)
                 showOnlineSongOptions = false
             },
             onNavigateToArtist = {

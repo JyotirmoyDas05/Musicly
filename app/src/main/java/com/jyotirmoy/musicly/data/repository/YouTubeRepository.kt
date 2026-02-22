@@ -62,7 +62,11 @@ interface YouTubeRepository {
     /** Get the explore page (new releases, mood & genres). */
     suspend fun getExplorePage(): Result<OnlineHomePage>
 
+    /** Get the full Moods & Genres categories list. */
+    suspend fun getMoodAndGenres(): Result<List<com.jyotirmoy.musicly.data.model.Genre>>
+
     /** Browse a mood/genre page by browseId to get its playlists. */
+
     suspend fun browseMood(browseId: String, params: String? = null): Result<OnlineMoodDetail>
 
     /** Get online playlist details (songs, author, thumbnail, etc.). */

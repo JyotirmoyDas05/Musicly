@@ -219,7 +219,10 @@ object AppModule {
         songRepository: SongRepository,
         favoritesDao: FavoritesDao,
         artistImageRepository: ArtistImageRepository,
-        folderTreeBuilder: FolderTreeBuilder
+        folderTreeBuilder: FolderTreeBuilder,
+        onlineDao: OnlineDao,
+        @PlayerCache playerCache: androidx.media3.datasource.cache.SimpleCache,
+        @DownloadCache downloadCache: androidx.media3.datasource.cache.SimpleCache
     ): MusicRepository {
         return MusicRepositoryImpl(
             context = context,
@@ -230,7 +233,10 @@ object AppModule {
             songRepository = songRepository,
             favoritesDao = favoritesDao,
             artistImageRepository = artistImageRepository,
-            folderTreeBuilder = folderTreeBuilder
+            folderTreeBuilder = folderTreeBuilder,
+            onlineDao = onlineDao,
+            playerCache = playerCache,
+            downloadCache = downloadCache
         )
     }
 

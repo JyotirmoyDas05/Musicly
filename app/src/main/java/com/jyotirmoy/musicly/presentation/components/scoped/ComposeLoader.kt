@@ -19,9 +19,7 @@ import kotlinx.coroutines.isActive
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
-// ------------------------------------------------------------
 // 1) Phase loader: compose a subtree only after a threshold, then keep it alive
-// ------------------------------------------------------------
 @Composable
 fun DeferAt(
     expansionFraction: Float,
@@ -48,11 +46,9 @@ fun DeferUntil(
     if (ready) content()
 }
 
-// ------------------------------------------------------------
 // 2) Smooth progress sampler for long-running sliders/meters
 // Cuts recompositions from ~50–60 FPS position updates down to ~5 FPS,
 // while animating the UI in between so it still looks 60 FPS.
-// ------------------------------------------------------------
 @Composable
 fun rememberSmoothProgress(
     isPlayingProvider: () -> Boolean,
@@ -62,14 +58,18 @@ fun rememberSmoothProgress(
     sampleWhilePausedMs: Long = 800L,
     isVisible: Boolean = true
 ): Pair<androidx.compose.runtime.State<Float>, androidx.compose.runtime.State<Long>> {
-    var sampledPosition by remember { mutableLongStateOf(0L) }
-    var targetFraction by remember { mutableFloatStateOf(0f) }
+    val initialPosition = remember(totalDuration) { currentPositionProvider() }
+    val safeDuration = totalDuration.coerceAtLeast(1L)
+    val safeUpperBound = totalDuration.coerceAtLeast(0L)
+    val initialFraction = remember(initialPosition, safeDuration) {
+        (initialPosition / safeDuration.toFloat()).coerceIn(0f, 1f)
+    }
+
+    var sampledPosition by remember(totalDuration) { mutableLongStateOf(initialPosition) }
+    var targetFraction by remember(totalDuration) { mutableFloatStateOf(initialFraction) }
 
     val latestPositionProvider by rememberUpdatedState(newValue = currentPositionProvider)
     val latestIsPlayingProvider by rememberUpdatedState(newValue = isPlayingProvider)
-
-    val safeDuration = totalDuration.coerceAtLeast(1L)
-    val safeUpperBound = totalDuration.coerceAtLeast(0L)
 
     LaunchedEffect(totalDuration, sampleWhilePlayingMs, sampleWhilePausedMs, isVisible) {
         if (!isVisible) return@LaunchedEffect

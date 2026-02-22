@@ -269,6 +269,7 @@ dependencies {
     implementation(libs.androidx.media3.session)
     implementation(libs.androidx.media3.exoplayer.ffmpeg)
     implementation(libs.androidx.media3.datasource.okhttp)
+    implementation(libs.androidx.media3.exoplayer.workmanager)
 
     // Palette API for color extraction
     implementation(libs.androidx.palette.ktx)

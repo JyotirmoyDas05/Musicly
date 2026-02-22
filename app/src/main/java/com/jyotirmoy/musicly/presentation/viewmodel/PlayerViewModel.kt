@@ -52,6 +52,7 @@ import com.jyotirmoy.musicly.data.model.Lyrics
 import com.jyotirmoy.musicly.data.model.LyricsSourcePreference
 import com.jyotirmoy.musicly.data.model.MusicFolder
 import com.jyotirmoy.musicly.data.model.SearchFilterType
+import com.jyotirmoy.musicly.data.model.SearchHistoryItem
 import com.jyotirmoy.musicly.data.model.Song
 import com.jyotirmoy.musicly.data.model.SortOption
 import com.jyotirmoy.musicly.data.model.toLibraryTabIdOrNull
@@ -69,6 +70,7 @@ import com.jyotirmoy.musicly.data.repository.MusicRepository
 import com.jyotirmoy.musicly.data.service.MusicNotificationProvider
 import com.jyotirmoy.musicly.data.service.MusicService
 import com.jyotirmoy.musicly.data.service.player.CastPlayer
+import com.jyotirmoy.musicly.data.service.player.DownloadUtil
 import com.jyotirmoy.musicly.data.service.http.MediaFileHttpServerService
 import com.jyotirmoy.musicly.data.service.player.DualPlayerEngine
 import com.jyotirmoy.musicly.data.worker.SyncManager
@@ -96,6 +98,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import com.jyotirmoy.musicly.data.database.OnlineDao
+import com.jyotirmoy.musicly.data.database.OnlineSongEntity
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -135,6 +139,7 @@ class PlayerViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val albumArtThemeDao: AlbumArtThemeDao,
     val syncManager: SyncManager, // Inyectar SyncManager
+    private val onlineDao: OnlineDao,
 
     private val dualPlayerEngine: DualPlayerEngine,
     private val appShortcutManager: AppShortcutManager,
@@ -153,11 +158,90 @@ class PlayerViewModel @Inject constructor(
     private val metadataEditStateHolder: MetadataEditStateHolder,
     private val externalMediaStateHolder: ExternalMediaStateHolder,
     val themeStateHolder: ThemeStateHolder,
+    private val downloadUtil: DownloadUtil,
     val multiSelectionStateHolder: MultiSelectionStateHolder
 ) : ViewModel() {
 
     private val _playerUiState = MutableStateFlow(PlayerUiState())
     val playerUiState: StateFlow<PlayerUiState> = _playerUiState.asStateFlow()
+
+    // ---- Download (ExoPlayer DownloadManager) ----
+
+    /** Live map of songId -> Download from ExoPlayer's DownloadManager. */
+    val downloads = downloadUtil.downloads
+
+    /** Whether a given song is fully downloaded inside the download cache. */
+    fun isExoDownloaded(songId: String): Boolean = downloadUtil.isDownloaded(songId)
+
+    /** Live download progress [0..1] for a given song. */
+    fun downloadProgressFor(songId: String): Float? = downloadUtil.progressFor(songId)
+
+    fun downloadOnlineSong(
+        songId: String,
+        title: String,
+        artist: String,
+        album: String? = null,
+        thumbnailUrl: String? = null
+    ) {
+        viewModelScope.launch {
+            try {
+                val mediaItem = androidx.media3.common.MediaItem.Builder()
+                    .setMediaId(songId)
+                    .setUri(songId)
+                    .setTag(title)
+                    .build()
+                val downloadRequest = androidx.media3.exoplayer.offline.DownloadRequest
+                    .Builder(songId, songId.toUri())
+                    .setCustomCacheKey(songId)
+                    .setData(title.toByteArray())
+                    .build()
+                androidx.media3.exoplayer.offline.DownloadService.sendAddDownload(
+                    context,
+                    com.jyotirmoy.musicly.data.service.ExoDownloadService::class.java,
+                    downloadRequest,
+                    /* foreground = */ false,
+                )
+                // Ensure the online song entity exists so the download listener can update it
+                val entity = OnlineSongEntity(
+                    id = songId,
+                    title = title,
+                    artistsText = artist,
+                    artistsJson = "[]",
+                    albumName = album,
+                    thumbnailUrl = thumbnailUrl,
+                    isDownloaded = false
+                )
+                onlineDao.insertOnlineSongIfAbsent(entity)
+                
+                sendToast("Downloading $title…")
+            } catch (e: Exception) {
+                sendToast("Failed to start download: ${e.message}")
+            }
+        }
+    }
+
+    fun deleteDownloadedOnlineSong(songId: String, title: String) {
+        viewModelScope.launch {
+            try {
+                androidx.media3.exoplayer.offline.DownloadService.sendRemoveDownload(
+                    context,
+                    com.jyotirmoy.musicly.data.service.ExoDownloadService::class.java,
+                    songId,
+                    /* foreground = */ false,
+                )
+                sendToast("Deleted $title")
+            } catch (e: Exception) {
+                sendToast("Failed to delete: ${e.message}")
+            }
+        }
+    }
+
+    // kept for backward compat, uses ExoPlayer download state now
+    fun isSongDownloaded(songId: String): Flow<Boolean> =
+        downloads.map { map -> map[songId]?.state == androidx.media3.exoplayer.offline.Download.STATE_COMPLETED }
+
+    // ---- End Download ----
+
 
     val stablePlayerState: StateFlow<StablePlayerState> = playbackStateHolder.stablePlayerState
     /**
@@ -470,14 +554,6 @@ class PlayerViewModel @Inject constructor(
     }
 
 
-    // Last Library Tab Index
-    val lastLibraryTabIndexFlow: StateFlow<Int> =
-        userPreferencesRepository.lastLibraryTabIndexFlow.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = 0 // Default to Songs tab
-        )
-
     val libraryTabsFlow: StateFlow<List<String>> = userPreferencesRepository.libraryTabsOrderFlow
         .map { orderJson ->
             if (orderJson != null) {
@@ -491,6 +567,17 @@ class PlayerViewModel @Inject constructor(
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), listOf("SONGS", "ALBUMS", "ARTIST", "PLAYLISTS", "FOLDERS", "LIKED"))
+
+    // Last Library Tab Index
+    val lastLibraryTabIndexFlow: StateFlow<Int> =
+        libraryTabsFlow.map { tabs ->
+            tabs.indexOf("PLAYLISTS").coerceAtLeast(0)
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 3 // default PLAYLISTS index
+        )
+
 
     private val _loadedTabs = MutableStateFlow(emptySet<String>())
     private var lastBlockedDirectories: Set<String>? = null
@@ -3778,5 +3865,9 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             userPreferencesRepository.addCustomGenre(genre, iconResId)
         }
+    }
+
+    fun onSearchItemClicked(item: SearchHistoryItem) {
+        viewModelScope.launch { musicRepository.addSearchHistoryItemObj(item) }
     }
 }

@@ -19,9 +19,20 @@ interface SearchHistoryDao {
     @Query("DELETE FROM search_history WHERE query = :query")
     suspend fun deleteByQuery(query: String)
 
+    @Query("DELETE FROM search_history WHERE item_id = :itemId")
+    suspend fun deleteByItemId(itemId: String)
+
+    @Query("DELETE FROM search_history WHERE item_id = :itemId AND item_type = :itemType")
+    suspend fun deleteByItemIdAndType(itemId: String, itemType: String)
+
+
     @Query("DELETE FROM search_history")
     suspend fun clearAll()
 
     @Query("SELECT * FROM search_history ORDER BY timestamp DESC")
     suspend fun getAll(): List<SearchHistoryEntity>
+
+    @Query("SELECT * FROM search_history ORDER BY timestamp DESC")
+    fun observeAll(): kotlinx.coroutines.flow.Flow<List<SearchHistoryEntity>>
+
 }

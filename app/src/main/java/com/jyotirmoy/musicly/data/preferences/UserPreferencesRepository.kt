@@ -195,6 +195,9 @@ constructor(
         
         // Album View Preference
         val IS_ALBUMS_LIST_VIEW = booleanPreferencesKey("is_albums_list_view")
+        
+        // Downloads
+        val DOWNLOAD_DIRECTORY_URI = stringPreferencesKey("download_directory_uri")
     }
 
     val appRebrandDialogShownFlow: Flow<Boolean> =
@@ -205,6 +208,17 @@ constructor(
     suspend fun setAppRebrandDialogShown(wasShown: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.APP_REBRAND_DIALOG_SHOWN] = wasShown
+        }
+    }
+
+    val downloadDirectoryUriFlow: Flow<String?> =
+            dataStore.data.map { preferences ->
+                preferences[PreferencesKeys.DOWNLOAD_DIRECTORY_URI]
+            }
+
+    suspend fun setDownloadDirectoryUri(uri: String) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DOWNLOAD_DIRECTORY_URI] = uri
         }
     }
 
@@ -1274,9 +1288,12 @@ constructor(
             }
 
     suspend fun saveLastLibraryTabIndex(tabIndex: Int) {
+        // Disabled per user request to always default to Playlists tab when opening anew
+        /*
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.LAST_LIBRARY_TAB_INDEX] = tabIndex
         }
+        */
     }
 
     val mockGenresEnabledFlow: Flow<Boolean> =

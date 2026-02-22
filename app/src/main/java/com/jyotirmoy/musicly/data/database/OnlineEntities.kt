@@ -41,6 +41,8 @@ data class OnlineSongEntity(
     @ColumnInfo(name = "play_count") val playCount: Int = 0,
     @ColumnInfo(name = "last_played_timestamp") val lastPlayedTimestamp: Long = 0,
     @ColumnInfo(name = "date_added") val dateAdded: Long = 0,
+    @ColumnInfo(name = "is_downloaded") val isDownloaded: Boolean = false,
+    @ColumnInfo(name = "date_downloaded") val dateDownloaded: Long? = null,
 )
 
 /**
@@ -96,6 +98,30 @@ fun OnlineSongEntity.toMediaMetadata(): MediaMetadata {
         thumbnailUrl = thumbnailUrl,
         explicit = explicit,
         isLocal = false,
+    )
+}
+
+/**
+ * Convert an [OnlineSongEntity] to [com.jyotirmoy.musicly.data.model.Song].
+ */
+fun OnlineSongEntity.toSong(): com.jyotirmoy.musicly.data.model.Song {
+    val parsedArtists = parseArtistsJson(artistsJson)
+    return com.jyotirmoy.musicly.data.model.Song(
+        id = id,
+        title = title,
+        artist = artistsText,
+        artistId = -1L,
+        artists = parsedArtists.map { com.jyotirmoy.musicly.data.model.ArtistRef(id = -1L, name = it.name, isPrimary = false) },
+        album = albumName ?: "",
+        albumId = -1L,
+        path = "", // isOnline = true
+        contentUriString = "",
+        albumArtUriString = thumbnailUrl,
+        duration = (duration?.toLong() ?: 0L) * 1000,
+        dateAdded = dateAdded,
+        mimeType = "audio/mpeg",
+        bitrate = 0,
+        sampleRate = 0
     )
 }
 

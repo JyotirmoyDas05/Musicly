@@ -20,9 +20,10 @@ interface LrcLibApiService {
     suspend fun getLyrics(
         @Query("track_name") trackName: String,
         @Query("artist_name") artistName: String,
-        @Query("album_name") albumName: String,
+        @Query("album_name") albumName: String?,
         @Query("duration") duration: Int
     ): LrcLibResponse?
+
 
     /**
      * Search for lyrics using flexible query parameters.

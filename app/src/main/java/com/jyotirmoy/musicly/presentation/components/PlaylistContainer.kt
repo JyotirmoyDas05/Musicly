@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -100,6 +101,11 @@ import androidx.compose.ui.graphics.Path
 import com.jyotirmoy.musicly.ui.theme.GoogleSansRounded
 import com.jyotirmoy.musicly.utils.resolvePlaylistCoverContentColor
 import kotlin.collections.set
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.TrendingUp
+import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.foundation.shape.GenericShape
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -113,7 +119,11 @@ fun PlaylistContainer(
     playerViewModel: PlayerViewModel,
     isAddingToPlaylist: Boolean = false,
     selectedPlaylists: SnapshotStateMap<String, Boolean>? = null,
-    filteredPlaylists: List<Playlist> = playlistUiState.playlists
+    filteredPlaylists: List<Playlist> = playlistUiState.playlists,
+    onLikedClick: () -> Unit = {},
+    onDownloadedClick: () -> Unit = {},
+    onTop50Click: () -> Unit = {},
+    onCachedClick: () -> Unit = {}
 ) {
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -124,50 +134,6 @@ fun PlaylistContainer(
             ) { CircularProgressIndicator() }
         }
 
-        if (filteredPlaylists.isEmpty() && !playlistUiState.isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                Column(
-                    modifier = Modifier.padding(top = 28.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    SineWaveLine(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(32.dp)
-                            .padding(horizontal = 8.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
-                        alpha = 0.95f,
-                        strokeWidth = 3.dp,
-                        amplitude = 4.dp,
-                        waves = 7.6f,
-                        phase = 0f
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Icon(
-                        Icons.AutoMirrored.Rounded.PlaylistPlay,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "No playlist has been created.",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "Touch the 'New Playlist' button to start.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        } else {
             if (isAddingToPlaylist) {
                 PlaylistItems(
                     currentSong = currentSong,
@@ -176,7 +142,12 @@ fun PlaylistContainer(
                     playerViewModel = playerViewModel,
                     isAddingToPlaylist = true,
                     filteredPlaylists = filteredPlaylists,
-                    selectedPlaylists = selectedPlaylists
+                    selectedPlaylists = selectedPlaylists,
+                    isLoading = playlistUiState.isLoading,
+                    onLikedClick = onLikedClick,
+                    onDownloadedClick = onDownloadedClick,
+                    onTop50Click = onTop50Click,
+                    onCachedClick = onCachedClick
                 )
             } else {
                 val playlistPullToRefreshState = rememberPullToRefreshState()
@@ -197,7 +168,12 @@ fun PlaylistContainer(
                         bottomBarHeight = bottomBarHeight,
                         navController = navController,
                         playerViewModel = playerViewModel,
-                        filteredPlaylists = filteredPlaylists
+                        filteredPlaylists = filteredPlaylists,
+                        isLoading = playlistUiState.isLoading,
+                        onLikedClick = onLikedClick,
+                        onDownloadedClick = onDownloadedClick,
+                        onTop50Click = onTop50Click,
+                        onCachedClick = onCachedClick
                     )
                 }
             }
@@ -216,7 +192,6 @@ fun PlaylistContainer(
                     )
                 //.align(Alignment.TopCenter)
             )
-        }
     }
 }
 
@@ -229,7 +204,12 @@ fun PlaylistItems(
     playerViewModel: PlayerViewModel,
     isAddingToPlaylist: Boolean = false,
     filteredPlaylists: List<Playlist>,
-    selectedPlaylists: SnapshotStateMap<String, Boolean>? = null
+    selectedPlaylists: SnapshotStateMap<String, Boolean>? = null,
+    isLoading: Boolean = false,
+    onLikedClick: () -> Unit = {},
+    onDownloadedClick: () -> Unit = {},
+    onTop50Click: () -> Unit = {},
+    onCachedClick: () -> Unit = {}
 ) {
     val stablePlayerState by playerViewModel.stablePlayerStateInfrequent.collectAsState()
     val listState = rememberLazyListState()
@@ -262,7 +242,72 @@ fun PlaylistItems(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(bottom = bottomBarHeight + MiniPlayerHeight + 30.dp)
         ) {
-            items(filteredPlaylists, key = { it.id }) { playlist ->
+            if (!isAddingToPlaylist) {
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            FolderGridCard(modifier = Modifier.weight(1f), title = "Liked", icon = Icons.Rounded.FavoriteBorder, onClick = onLikedClick)
+                            FolderGridCard(modifier = Modifier.weight(1f), title = "Downloaded", icon = Icons.Rounded.Download, onClick = onDownloadedClick)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            FolderGridCard(modifier = Modifier.weight(1f), title = "My top 50", icon = Icons.Rounded.TrendingUp, onClick = onTop50Click)
+                            FolderGridCard(modifier = Modifier.weight(1f), title = "Cached", icon = Icons.Rounded.Sync, onClick = onCachedClick)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+
+            if (filteredPlaylists.isEmpty() && !isLoading) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.TopCenter
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(top = 28.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            com.jyotirmoy.musicly.presentation.components.subcomps.SineWaveLine(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(32.dp)
+                                    .padding(horizontal = 8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
+                                alpha = 0.95f,
+                                strokeWidth = 3.dp,
+                                amplitude = 4.dp,
+                                waves = 7.6f,
+                                phase = 0f
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            Icon(
+                                Icons.AutoMirrored.Rounded.PlaylistPlay,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "No other playlist has been created.",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "Touch the 'New Playlist' button to start or Import One.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            } else {
+                items(filteredPlaylists, key = { it.id }) { playlist ->
                 val rememberedOnClick = remember(playlist.id) {
                     {
                         if (isAddingToPlaylist && currentSong != null && selectedPlaylists != null) {
@@ -280,7 +325,8 @@ fun PlaylistItems(
                     selectedPlaylists = selectedPlaylists
                 )
             }
-        }
+            } // Close the 'else' block
+        } // Close LazyColumn
         
         // ScrollBar Overlay
         val bottomPadding = if (stablePlayerState.currentSong != null && stablePlayerState.currentSong != Song.emptySong()) 
@@ -293,6 +339,36 @@ fun PlaylistItems(
                 .align(Alignment.CenterEnd)
                 .padding(end = 4.dp, top = 16.dp, bottom = bottomPadding),
             listState = listState
+        )
+    }
+}
+
+@Composable
+private fun FolderGridCard(modifier: Modifier = Modifier, title: String, icon: ImageVector, onClick: () -> Unit) {
+    Column(modifier = modifier) {
+        Card(
+            modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+            onClick = onClick,
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha=0.5f)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    modifier = Modifier.size(64.dp), 
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha=0.8f)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = title, 
+            style = MaterialTheme.typography.titleMedium.copy(fontFamily = GoogleSansRounded), 
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }

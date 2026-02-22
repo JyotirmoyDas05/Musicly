@@ -195,8 +195,14 @@ class YouTubeRepositoryImpl @Inject constructor(
                     OnlineHomeSection(
                         title = "Moods & Genres",
                         items = explorePage.moodAndGenres.map { moodItem ->
+                            // Ensure unique ID for different categories
+                            val uniqueId = if (moodItem.endpoint.browseId == "FEmusic_moods_and_genres_category") {
+                                "${moodItem.endpoint.browseId}_${moodItem.title.lowercase().replace(" ", "_")}"
+                            } else {
+                                moodItem.endpoint.browseId
+                            }
                             OnlineContentItem.MoodContent(
-                                id = moodItem.endpoint.browseId,
+                                id = uniqueId,
                                 title = moodItem.title,
                                 stripeColor = moodItem.stripeColor,
                                 params = moodItem.endpoint.params,
@@ -209,6 +215,64 @@ class YouTubeRepositoryImpl @Inject constructor(
             OnlineHomePage(sections = sections)
         }
     }
+
+    override suspend fun getMoodAndGenres(): Result<List<com.jyotirmoy.musicly.data.model.Genre>> {
+        // Try explore page moods as it's more reliable for a quick overview
+        val exploreResult = YouTube.explore()
+        val exploreGenres = if (exploreResult.isSuccess) {
+            exploreResult.getOrThrow().moodAndGenres.map { moodItem ->
+                val hexColor = try {
+                    String.format("#%06X", (0xFFFFFF and moodItem.stripeColor.toInt()))
+                } catch (e: Exception) {
+                    null
+                }
+                // Use a combination of browseId, title and params to ensure uniqueness
+                val uniqueId = "remote_${moodItem.endpoint.browseId}_${moodItem.title.lowercase().replace(" ", "_")}_${moodItem.endpoint.params ?: ""}"
+                
+                com.jyotirmoy.musicly.data.model.Genre(
+                    id = uniqueId,
+                    name = moodItem.title,
+                    lightColorHex = hexColor,
+                    darkColorHex = hexColor,
+                    onLightColorHex = "#FFFFFF",
+                    onDarkColorHex = "#FFFFFF",
+                    thumbnailUrl = null
+                )
+            }
+        } else emptyList()
+
+        // Then try the dedicated moodAndGenres call which returns sections
+        val dedicatedResult = YouTube.moodAndGenres()
+        val dedicatedGenres = if (dedicatedResult.isSuccess) {
+            dedicatedResult.getOrThrow().flatMap { section ->
+                section.items.map { moodItem ->
+                    val hexColor = try {
+                        String.format("#%06X", (0xFFFFFF and moodItem.stripeColor.toInt()))
+                    } catch (e: Exception) {
+                        null
+                    }
+                    val uniqueId = "remote_${moodItem.endpoint.browseId}_${moodItem.title.lowercase().replace(" ", "_")}"
+                    com.jyotirmoy.musicly.data.model.Genre(
+                        id = uniqueId,
+                        name = moodItem.title,
+                        lightColorHex = hexColor,
+                        darkColorHex = hexColor,
+                        onLightColorHex = "#FFFFFF",
+                        onDarkColorHex = "#FFFFFF",
+                        thumbnailUrl = null
+                    )
+                }
+            }
+        } else emptyList()
+
+        val allGenres = (exploreGenres + dedicatedGenres).distinctBy { it.id }
+        return if (allGenres.isNotEmpty()) {
+            Result.success(allGenres)
+        } else {
+            Result.failure(Exception("Failed to fetch moods and genres"))
+        }
+    }
+
 
     override suspend fun browseMood(browseId: String, params: String?): Result<OnlineMoodDetail> {
         return YouTube.browse(browseId, params).map { browseResult ->

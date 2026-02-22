@@ -1,12 +1,15 @@
 package com.jyotirmoy.musicly.presentation.screens.search.components
 
 import androidx.annotation.OptIn
-import androidx.compose.runtime.collectAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,33 +17,42 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.items as listItems
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ViewList
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import com.jyotirmoy.musicly.data.model.Genre
+import com.jyotirmoy.musicly.data.model.SearchHistoryItem
 import com.jyotirmoy.musicly.presentation.components.MiniPlayerHeight
 import com.jyotirmoy.musicly.presentation.components.NavBarContentHeight
 import com.jyotirmoy.musicly.presentation.components.SmartImage
@@ -53,16 +65,18 @@ import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 @Composable
 fun GenreCategoriesGrid(
     genres: List<Genre>,
+    recentItems: List<SearchHistoryItem> = emptyList(),
+    onRecentItemClick: (SearchHistoryItem) -> Unit = {},
     onGenreClick: (Genre) -> Unit,
     playerViewModel: PlayerViewModel,
     modifier: Modifier = Modifier
 ) {
-    if (genres.isEmpty()) {
+    if (genres.isEmpty() && recentItems.isEmpty()) {
         Box(
             modifier = modifier.fillMaxSize().padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text("No genres available.", style = MaterialTheme.typography.bodyLarge)
+            Text("No content available.", style = MaterialTheme.typography.bodyLarge)
         }
         return
     }
@@ -73,7 +87,6 @@ fun GenreCategoriesGrid(
         context = kotlin.coroutines.EmptyCoroutineContext
     ).value
 
-    // Persistence: Collect from ViewModel
     val isGridView by playerViewModel.isGenreGridView.collectAsState()
 
     LazyVerticalGrid(
@@ -98,8 +111,36 @@ fun GenreCategoriesGrid(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        if (recentItems.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Column {
+                    Text(
+                        text = "Recent Searches",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(start = 6.dp, top = 6.dp, bottom = 12.dp)
+                    )
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp)
+                    ) {
+                        listItems(
+                            items = recentItems,
+                            key = { it.id ?: "history_${it.query}_${it.timestamp}" }
+                        ) { item ->
+                            RecentItemCard(
+                                item = item,
+                                onClick = { onRecentItemClick(item) }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
+        }
+
         item(span = { GridItemSpan(maxLineSpan) }) {
-            androidx.compose.foundation.layout.Row(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 6.dp, top = 6.dp, bottom = 6.dp, end = 0.dp),
@@ -111,35 +152,94 @@ fun GenreCategoriesGrid(
                     style = MaterialTheme.typography.titleLarge
                 )
                 
-                // Toggle Button with persistence and styling
-                // "Round to Square (12dp) when selected" logic:
-                // Assuming List View is the "Selected" / "Alternative" state.
-                val shape = androidx.compose.animation.core.animateFloatAsState(
-                    targetValue = if (!isGridView) 12f else 50f, // 12dp for List, 50% (Circle) for Grid
+                val shape = animateFloatAsState(
+                    targetValue = if (!isGridView) 12f else 50f,
                     label = "shapeAnimation"
                 )
                 
-                androidx.compose.material3.FilledIconButton(
+                FilledIconButton(
                     onClick = { playerViewModel.toggleGenreViewMode() },
-                    colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
+                    colors = IconButtonDefaults.filledIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
                         contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                     ),
                     shape = RoundedCornerShape(shape.value.dp)
                 ) {
-                    androidx.compose.material3.Icon(
+                    Icon(
                         imageVector = if (isGridView) Icons.Rounded.ViewList else Icons.Rounded.GridView,
                         contentDescription = "Toggle Grid/List View"
                     )
                 }
             }
         }
-        items(genres, key = { it.id }) { genre ->
+        gridItems(
+            items = genres,
+            key = { "grid_genre_${it.id}" }
+        ) { genre ->
             GenreCard(
                 genre = genre,
                 customIcons = customGenreIcons,
                 onClick = { onGenreClick(genre) },
                 isGridView = isGridView
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecentItemCard(
+    item: SearchHistoryItem,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(120.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (item.thumbnailUrl != null) {
+            val shape = if (item.itemType == "artist") CircleShape else RoundedCornerShape(12.dp)
+            SmartImage(
+                model = item.thumbnailUrl,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(90.dp)
+                    .clip(shape),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(90.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Search,
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = item.query,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (item.subtitle != null) {
+            Text(
+                text = item.subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -163,11 +263,10 @@ private fun GenreCard(
     val backgroundColor = themeColor.container
     val onBackgroundColor = themeColor.onContainer
 
-    // Layout Modifier Logic
     val cardModifier = if (isGridView) {
         Modifier.aspectRatio(1.2f)
     } else {
-        Modifier.fillMaxWidth().height(100.dp) // Fixed height for list view, full width
+        Modifier.fillMaxWidth().height(100.dp)
     }
 
     Card(
@@ -202,7 +301,6 @@ private fun GenreCard(
                 .clip(RoundedCornerShape(24.dp))
                 .background(backgroundColor)
         ) {
-            // Genre image in bottom right corner
             Box(
                 modifier = Modifier
                     .size(90.dp) 
@@ -210,20 +308,19 @@ private fun GenreCard(
                     .offset(x = 16.dp, y = 16.dp) 
             ) {
                 SmartImage(
-                    model = GenreIconProvider.getGenreImageResource(genre.name, customIcons),
+                    model = genre.thumbnailUrl ?: GenreIconProvider.getGenreImageResource(genre.name, customIcons),
                     contentDescription = "Genre illustration",
                     modifier = Modifier
                         .fillMaxSize()
                         .alpha(0.55f),
-                    colorFilter = ColorFilter.tint(onBackgroundColor),
+                    colorFilter = if (genre.thumbnailUrl == null) ColorFilter.tint(onBackgroundColor) else null,
                     contentScale = ContentScale.Crop
                 )
             }
 
-            // Genre name in top left corner
             val baseStyle = GenreTypography.getGenreStyle(genre.id, genre.name)
             val finalStyle = if (isGridView) baseStyle else baseStyle.copy(
-                fontSize = baseStyle.fontSize * 1.3f // 30% larger in List View
+                fontSize = baseStyle.fontSize * 1.3f
             )
 
             Text(
@@ -235,10 +332,10 @@ private fun GenreCard(
                 softWrap = true,
                 minLines = 1,
                 maxLines = 3, 
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .fillMaxWidth(if (isGridView) 0.65f else 0.8f) // More width in List View (80%)
+                    .fillMaxWidth(if (isGridView) 0.65f else 0.8f)
                     .padding(start = 14.dp, top = 14.dp, end = 0.dp)
             )
         }

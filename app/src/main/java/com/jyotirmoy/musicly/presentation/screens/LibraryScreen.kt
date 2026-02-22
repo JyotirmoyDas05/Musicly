@@ -55,6 +55,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
@@ -952,7 +953,18 @@ fun LibraryScreen(
                                             playerViewModel = playerViewModel,
                                             bottomBarHeight = bottomBarHeightDp,
                                             isRefreshing = isRefreshing,
-                                            onRefresh = onRefresh
+                                            onRefresh = onRefresh,
+                                            onLikedClick = {
+                                                val likedIndex = tabTitles.indexOf("LIKED")
+                                                if (likedIndex != -1) {
+                                                    scope.launch {
+                                                        pagerState.animateScrollToPage(likedIndex)
+                                                    }
+                                                }
+                                            },
+                                            onDownloadedClick = { navController.navigate(Screen.DownloadedSongs.route) },
+                                            onCachedClick = { navController.navigate(Screen.CachedSongs.route) },
+                                            onTop50Click = { navController.navigate(Screen.Stats.route) }
                                         )
                                     }
 
@@ -1023,7 +1035,9 @@ fun LibraryScreen(
                                                 onSongSelectionToggle = onSongSelectionToggle,
                                                 getSelectionIndex = playerViewModel.multiSelectionStateHolder::getSelectionIndex,
                                                 onLocateCurrentSongVisibilityChanged = { foldersShowLocateButton = it },
-                                                onRegisterLocateCurrentSongAction = { foldersLocateAction = it }
+                                                onRegisterLocateCurrentSongAction = { foldersLocateAction = it },
+                                                onDownloadedClick = { navController.navigate(Screen.DownloadedSongs.route) },
+                                                onCachedClick = { navController.navigate(Screen.CachedSongs.route) }
                                             )
                                         } else {
                                             Column(
@@ -1735,7 +1749,9 @@ fun LibraryFoldersTab(
     onSongSelectionToggle: (Song) -> Unit = {},
     getSelectionIndex: (String) -> Int? = { null },
     onLocateCurrentSongVisibilityChanged: (Boolean) -> Unit = {},
-    onRegisterLocateCurrentSongAction: ((() -> Unit)?) -> Unit = {}
+    onRegisterLocateCurrentSongAction: ((() -> Unit)?) -> Unit = {},
+    onDownloadedClick: () -> Unit = {},
+    onCachedClick: () -> Unit = {}
 ) {
     // List state moved inside AnimatedContent to prevent state sharing issues during transitions
 
@@ -1893,6 +1909,29 @@ fun LibraryFoldersTab(
                                     bottom = bottomBarHeight + MiniPlayerHeight + ListExtraBottomGap,
                                     top = 0.dp                            )
                             ) {
+                                if (isRoot && !showPlaylistCards) {
+                                    item(key = "downloaded_songs_folder") {
+                                        FolderListItem(
+                                            folderName = "Downloaded Songs",
+                                            iconRes = R.drawable.rounded_download_24,
+                                            onClick = onDownloadedClick
+                                        )
+                                    }
+                                    item(key = "cached_songs_folder") {
+                                        FolderListItem(
+                                            folderName = "Cached Songs",
+                                            iconRes = R.drawable.rounded_hourglass_24,
+                                            onClick = onCachedClick
+                                        )
+                                    }
+                                    item(key = "folders_divider") {
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                                        )
+                                    }
+                                }
+
                                 if (showPlaylistCards) {
                                     items(itemsToShow, key = { it.path }) { folder ->
                                         FolderPlaylistItem(
@@ -1999,6 +2038,20 @@ fun FolderPlaylistItem(folder: MusicFolder, onClick: () -> Unit) {
 
 @Composable
 fun FolderListItem(folder: MusicFolder, onClick: () -> Unit) {
+    FolderListItem(
+        folderName = folder.name,
+        songCount = folder.totalSongCount,
+        onClick = onClick
+    )
+}
+
+@Composable
+fun FolderListItem(
+    folderName: String,
+    songCount: Int? = null,
+    iconRes: Int = R.drawable.ic_folder,
+    onClick: () -> Unit
+) {
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -2008,8 +2061,8 @@ fun FolderListItem(folder: MusicFolder, onClick: () -> Unit) {
     ) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                painter = painterResource(id = R.drawable.ic_folder),
-                contentDescription = "Folder",
+                painter = painterResource(id = iconRes),
+                contentDescription = null,
                 modifier = Modifier
                     .size(48.dp)
                     .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
@@ -2018,8 +2071,10 @@ fun FolderListItem(folder: MusicFolder, onClick: () -> Unit) {
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column {
-                Text(folder.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text("${folder.totalSongCount} Songs", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(folderName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                if (songCount != null) {
+                    Text("$songCount Songs", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }
@@ -3072,7 +3127,11 @@ fun LibraryPlaylistsTab(
     playerViewModel: PlayerViewModel,
     bottomBarHeight: Dp,
     isRefreshing: Boolean,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onLikedClick: () -> Unit = {},
+    onDownloadedClick: () -> Unit = {},
+    onTop50Click: () -> Unit = {},
+    onCachedClick: () -> Unit = {}
 ) {
     PlaylistContainer(
         playlistUiState = playlistUiState,
@@ -3081,6 +3140,10 @@ fun LibraryPlaylistsTab(
         bottomBarHeight = bottomBarHeight,
         navController = navController,
         playerViewModel = playerViewModel,
+        onLikedClick = onLikedClick,
+        onDownloadedClick = onDownloadedClick,
+        onTop50Click = onTop50Click,
+        onCachedClick = onCachedClick
     )
 }
 

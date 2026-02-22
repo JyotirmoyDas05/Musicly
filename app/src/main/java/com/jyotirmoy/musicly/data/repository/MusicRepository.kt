@@ -147,9 +147,12 @@ interface MusicRepository {
 
     // Search History
     suspend fun addSearchHistoryItem(query: String)
+    suspend fun addSearchHistoryItemObj(item: SearchHistoryItem)
     suspend fun getRecentSearchHistory(limit: Int): List<SearchHistoryItem>
+    fun observeRecentSearchHistory(): Flow<List<SearchHistoryItem>>
     suspend fun deleteSearchHistoryItemByQuery(query: String)
     suspend fun clearSearchHistory()
+
 
     /**
      * Gets the list of songs for a specific genre (placeholder implementation).
@@ -221,6 +224,16 @@ interface MusicRepository {
     suspend fun resetAllLyrics()
 
     fun getMusicFolders(): Flow<List<com.jyotirmoy.musicly.data.model.MusicFolder>>
+
+    /**
+     * Returns a merged list of local audio files and explicitly downloaded online songs.
+     */
+    fun getDownloadedSongs(): Flow<List<Song>>
+
+    /**
+     * Returns a list of songs currently present in the streaming cache.
+     */
+    fun getCachedSongs(): Flow<List<Song>>
 
     suspend fun deleteById(id: Long)
 }

@@ -22,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         FormatCacheEntity::class,
         OnlineSearchHistoryEntity::class,
     ],
-    version = 16, // Added online music entities (online_songs, online_format_cache, online_search_history)
+    version = 18, // Added is_downloaded + date_downloaded to online_songs
     exportSchema = false
 )
 abstract class MusiclyDatabase : RoomDatabase() {
@@ -36,6 +36,22 @@ abstract class MusiclyDatabase : RoomDatabase() {
     abstract fun onlineDao(): OnlineDao
 
     companion object {
+        val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE online_songs ADD COLUMN is_downloaded INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE online_songs ADD COLUMN date_downloaded INTEGER DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE search_history ADD COLUMN item_type TEXT NOT NULL DEFAULT 'query'")
+                db.execSQL("ALTER TABLE search_history ADD COLUMN item_id TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE search_history ADD COLUMN subtitle TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE search_history ADD COLUMN thumbnail_url TEXT DEFAULT NULL")
+            }
+        }
+
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE songs ADD COLUMN parent_directory_path TEXT NOT NULL DEFAULT ''")
